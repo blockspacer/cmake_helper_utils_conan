@@ -31,6 +31,22 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/Find${PROJECT_NAME}.cmake
  ${CMAKE_CURRENT_BINARY_DIR}/Find${PROJECT_NAME}.cmake
  COPYONLY)
 install(FILES
-   ${CMAKE_CURRENT_SOURCE_DIR}/cmake/Find${PROJECT_NAME}.cmake
-   DESTINATION "."
+  ${CMAKE_CURRENT_SOURCE_DIR}/cmake/Find${PROJECT_NAME}.cmake
+  DESTINATION "."
+)
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/create_doxy_mcss.cmake
+ ${CMAKE_CURRENT_BINARY_DIR}/create_doxy_mcss.cmake
+ COPYONLY)
+install(FILES
+  ${CMAKE_CURRENT_SOURCE_DIR}/cmake/create_doxy_mcss.cmake
+  DESTINATION "."
+)
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/configure_doxygen.cmake
+ ${CMAKE_CURRENT_BINARY_DIR}/configure_doxygen.cmake
+ COPYONLY)
+install(FILES
+  ${CMAKE_CURRENT_SOURCE_DIR}/cmake/configure_doxygen.cmake
+  DESTINATION "."
 )

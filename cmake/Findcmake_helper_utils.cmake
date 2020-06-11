@@ -1,5 +1,132 @@
 # cmake utils
 
+# This macro lets you find executable programs on the host system
+# Usefull for emscripten
+macro(find_host_package)
+  set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+  set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY NEVER)
+  set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE NEVER)
+  find_package(${ARGN})
+  set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM BOTH)
+  set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY BOTH)
+  set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE BOTH)
+endmacro(find_host_package)
+
+# Useful cause some systems don`t allow easy package finding
+macro(findPackageCrossPlatform)
+  if(EMSCRIPTEN)
+      find_host_package(${ARGN})
+  elseif(ANDROID)
+      find_host_package(${ARGN})
+  elseif(CMAKE_HOST_WIN32)
+      find_package(${ARGN})
+  elseif(CMAKE_HOST_UNIX)
+    find_package(${ARGN})
+  else()
+      message( "Unknown platform, using find_package" )
+      find_package(${ARGN})
+  endif()
+endmacro(findPackageCrossPlatform)
+
+# Get names of subdirectories in directory
+macro(list_subdirectories result curdir)
+  FILE(GLOB children RELATIVE ${curdir} ${curdir}/*)
+  SET(dirlist "")
+  foreach (child ${children})
+    if (IS_DIRECTORY ${curdir}/${child} AND NOT ${child} STREQUAL "CMakeFiles")
+      list(APPEND dirlist ${child})
+    endif()
+  endforeach ()
+  set(${result} ${dirlist})
+endmacro()
+
+# Performs searching and adding of files to source list
+# Appends source files to ${${PROJECT_NAME}_SRCS}
+# Appends header files to ${${PROJECT_NAME}_HEADERS}
+# Appends dir (argument) to ${${PROJECT_NAME}_DIRS}
+# Appends extra_patterns (argument) to ${${PROJECT_NAME}_EXTRA}
+# Example of extra_patterns: "cmake/*.cmake;cmake/*.imp"
+macro(addFolder dir prefix extra_patterns)
+  if (NOT EXISTS "${dir}")
+    message(FATAL_ERROR "${dir} doesn`t exist!")
+  endif()
+
+  set(src_files "")
+  set(header_files "")
+  set(globType GLOB)
+  if(${ARGC} GREATER 1 AND "${ARGV1}" STREQUAL "RECURSIVE")
+      set(globType GLOB_RECURSE)
+  endif()
+  # Note: Certain IDEs will only display files that belong to a target, so add .h files too.
+  file(${globType} src_files ABSOLUTE
+      ${dir}/*.c
+      ${dir}/*.cc
+      ${dir}/*.cpp
+      ${dir}/*.asm
+      ${extra_patterns}
+  )
+  file(${globType} header_files ABSOLUTE
+      ${dir}/*.h
+      ${dir}/*.hpp
+      ${extra_patterns}
+  )
+  file(${globType} extra_files ABSOLUTE
+      ${extra_patterns}
+  )
+  LIST(APPEND ${prefix}_SRCS ${src_files})
+  LIST(APPEND ${prefix}_HEADERS ${header_files})
+  LIST(APPEND ${prefix}_EXTRA ${extra_files})
+  LIST(APPEND ${prefix}_DIRS ${dir})
+endmacro()
+
+# Performs searching recursively and adding of files to source list
+macro(addFolderRecursive dir prefix)
+  addFolder("${dir}" "${prefix}" "" "RECURSIVE")
+endmacro()
+
+# add item at the beginning of the list
+function(list_prepend var prefix)
+  set(listVar "")
+  list(APPEND listVar "${prefix}")
+  list(APPEND listVar ${${var}})
+  list(REMOVE_DUPLICATES listVar)
+  set(${var} "${listVar}" PARENT_SCOPE)
+endfunction(list_prepend)
+
+# prefer ASCII for folder names
+function(force_latin_paths)
+  if(WIN32)
+    set(force_latin_paths_separator
+      ":")
+  endif()
+
+  set(force_latin_paths_path_regex
+    "^([A-Za-z0-9${force_latin_paths_separator}._/-]+)$")
+
+  if(NOT "${CMAKE_SOURCE_DIR}" MATCHES "${force_latin_paths_path_regex}" OR NOT "${CMAKE_BINARY_DIR}" MATCHES "${force_latin_paths_path_regex}")
+      message(FATAL_ERROR
+        "Ensure that the source and build paths contain only the following characters: alphanumeric, dash, underscore, slash, dot (and colon on Windows)")
+  endif()
+endfunction(force_latin_paths)
+
+# out dirs must be not empty
+function(validate_out_dirs)
+  if (NOT CMAKE_ARCHIVE_OUTPUT_DIRECTORY)
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY
+      ${CMAKE_BINARY_DIR}/arc)
+  endif()
+
+  if (NOT CMAKE_LIBRARY_OUTPUT_DIRECTORY)
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY
+      ${CMAKE_BINARY_DIR}/bin/lib)
+  endif()
+
+  if (NOT CMAKE_RUNTIME_OUTPUT_DIRECTORY)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY
+      ${CMAKE_BINARY_DIR}/bin)
+  endif()
+endfunction(validate_out_dirs)
+
 ## ---------------------------- cppcheck -------------------------------- ##
 
 # NOTE: global var.
@@ -81,7 +208,8 @@ function(find_program_helper)
   #
   set(args_unparsed ${ARGUMENTS_UNPARSED_ARGUMENTS})
   if(${ARGUMENTS_VERBOSE})
-    message(STATUS "validate: ARGUMENTS_UNPARSED_ARGUMENTS=${ARGUMENTS_UNPARSED_ARGUMENTS}")
+    message(STATUS
+      "validate: ARGUMENTS_UNPARSED_ARGUMENTS=${ARGUMENTS_UNPARSED_ARGUMENTS}")
   endif(${ARGUMENTS_VERBOSE})
 
   # default
@@ -106,8 +234,10 @@ function(find_program_helper)
     message(FATAL_ERROR ${TEXT})
   endif(ARGUMENTS_REQUIRED AND NOT ${ARGUMENTS_OUT_VAR}_FOUND_PROGRAM)
   if(${ARGUMENTS_VERBOSE})
-    message(STATUS "ARGUMENTS_UNPARSED_ARGUMENTS=${ARGUMENTS_UNPARSED_ARGUMENTS}")
-    message(STATUS "${ARGUMENTS_OUT_VAR}_FOUND_PROGRAM=${${ARGUMENTS_OUT_VAR}_FOUND_PROGRAM}")
+    message(STATUS
+      "ARGUMENTS_UNPARSED_ARGUMENTS=${ARGUMENTS_UNPARSED_ARGUMENTS}")
+    message(STATUS
+      "${ARGUMENTS_OUT_VAR}_FOUND_PROGRAM=${${ARGUMENTS_OUT_VAR}_FOUND_PROGRAM}")
   endif(${ARGUMENTS_VERBOSE})
 
   set(${ARGUMENTS_OUT_VAR} ${${ARGUMENTS_OUT_VAR}_FOUND_PROGRAM} PARENT_SCOPE)
@@ -288,7 +418,8 @@ function(validate)
   #
   set(args_unparsed ${ARGUMENTS_UNPARSED_ARGUMENTS})
   if(${ARGUMENTS_VERBOSE})
-    message(STATUS "validate: ARGUMENTS_UNPARSED_ARGUMENTS=${ARGUMENTS_UNPARSED_ARGUMENTS}")
+    message(STATUS
+      "validate: ARGUMENTS_UNPARSED_ARGUMENTS=${ARGUMENTS_UNPARSED_ARGUMENTS}")
   endif(${ARGUMENTS_VERBOSE})
 
   # default
@@ -3142,3 +3273,837 @@ macro(compile_with_llvm_tools)
   set(CMAKE_OBJDUMP "${LLVM_OBJDUMP_PROGRAM}")
   set(CMAKE_RANLIB  "${LLVM_RANLIB_PROGRAM}")
 endmacro(compile_with_llvm_tools)
+
+################################################################################
+# ccache enables faster builds
+################################################################################
+
+# see https://www.virag.si/2015/07/use-ccache-with-cmake-for-faster-compilation/
+# TODO: Xcode support https://stackoverflow.com/a/36515503
+# TODO: CMAKE_XCODE_ATTRIBUTE_CC https://crascit.com/2016/04/09/using-ccache-with-cmake/
+macro(add_ccache)
+  find_program_helper(ccache
+    PATHS
+      ${CONAN_BIN_DIRS}
+      ${CONAN_BIN_DIRS_LLVM_TOOLS}
+    #NO_SYSTEM_ENVIRONMENT_PATH
+    #NO_CMAKE_SYSTEM_PATH
+    #${ARGUMENTS_UNPARSED_ARGUMENTS}
+    #REQUIRED
+    OUT_VAR CCACHE_PROGRAM
+    VERBOSE TRUE
+  )
+  #
+  if(CCACHE_PROGRAM)
+    set_property(GLOBAL PROPERTY
+      RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
+    set_property(GLOBAL PROPERTY
+      RULE_LAUNCH_LINK "${CCACHE_PROGRAM}")
+    message(STATUS "Using CCACHE. To see if ccache is really working, you can use ccache -s command, which will display ccache statistics.")
+    message(STATUS "CCACHE: On second and all subsequent compilations the “cache hit” values should increase and thus show that ccache is working.")
+  else()
+    message(WARNING "CCACHE not found, see https://askubuntu.com/a/470636 (also note /usr/sbin/update-ccache-symlinks).")
+  endif()
+endmacro()
+
+function(target_ccache_summary TARGET)
+  find_program_helper(ccache
+    PATHS
+      ${CONAN_BIN_DIRS}
+      ${CONAN_BIN_DIRS_LLVM_TOOLS}
+    #NO_SYSTEM_ENVIRONMENT_PATH
+    #NO_CMAKE_SYSTEM_PATH
+    #${ARGUMENTS_UNPARSED_ARGUMENTS}
+    #REQUIRED
+    OUT_VAR CCACHE_PROGRAM
+    VERBOSE TRUE
+  )
+  #
+  if(CCACHE_PROGRAM)
+    message("cmake summary: add_custom_target: ccache -s")
+    # NOTE: clean old build dirs to get fresh ccache summary
+    add_custom_target(ccache_stats ALL
+      COMMAND ${CCACHE_PROGRAM} -s
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+      COMMENT "!!!!!!!!!!!!!!!!!!!! getting ccache stats !!!!!!!!!!!!!!!!!!!!!!!!!!"
+      DEPENDS ${TARGET}
+    )
+  endif()
+endfunction()
+
+################################################################################
+# Gold linker.
+################################################################################
+
+# see https://cristianadam.eu/20170709/speeding-up-cmake/
+# TODO: use with gold: "--threads", "--thread-count COUNT", "--preread-archive-symbols"
+# NOTE: gold not threaded by default, configure with "--enable-threads"
+# NOTE: lld threaded by default, may be faster than gold
+macro(add_gold_linker)
+  if("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU")
+    execute_process(
+      COMMAND
+        ${CMAKE_C_COMPILER}
+        -fuse-ld=gold -Wl,--version
+        OUTPUT_VARIABLE stdout
+        ERROR_QUIET)
+    if("${stdout}" MATCHES "GNU gold")
+      set(CMAKE_C_FLAGS
+        "${CMAKE_C_FLAGS} -fuse-ld=gold")
+      set(CMAKE_CXX_FLAGS
+        "${CMAKE_CXX_FLAGS} -fuse-ld=gold")
+      set(CMAKE_EXE_LINKER_FLAGS
+        "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=gold -Wl,--disable-new-dtags")
+      set(CMAKE_STATIC_LINKER_FLAGS
+        "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=gold -Wl,--disable-new-dtags")
+      set(CMAKE_SHARED_LINKER_FLAGS
+        "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=gold -Wl,--disable-new-dtags")
+      message(STATUS
+        "Using GNU gold linker.")
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+      # Clang is using the LLVM Linker instead of the LLVM gold plugin. This is
+      # because the LLVM linker is faster. Linker and plugin:
+      # The LLVM-Linker     : https://lld.llvm.org/
+      # The LLVM gold plugin: https://llvm.org/docs/GoldPlugin.html
+      # TODO: -flto: This flag will also cause clang to look for the gold plugin in the lib directory under its prefix and pass the -plugin option to ld.
+      set(CMAKE_EXE_LINKER_FLAGS
+        "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=lld")
+      message(STATUS
+        "Using Clang lld instead of gold linker
+        because the LLVM linker is faster.")
+    else()
+      message(WARNING
+        "GNU gold linker isn't available, using the default system linker.")
+      message(WARNING
+        "To install gold linker: sudo apt-get install binutils-gold")
+    endif()
+  else()
+    message(WARNING
+      "GNU gold linker disabled.")
+  endif()
+endmacro()
+
+################################################################################
+# warning level
+################################################################################
+
+# Helper script to set warnings
+# Usage :
+#  target_set_warnings(target
+#    [ENABLE [ALL] [list of warning names]]
+#    [DISABLE [ALL/Annoying] [list of warning names]]
+#    [AS_ERROR ALL]
+#  )
+#
+# Example 1:
+# # Helper that can set default warning flags for you
+# target_set_warnings(${LIB_NAME}
+#   ENABLE ALL
+#   AS_ERROR ALL
+#   DISABLE Annoying)
+#
+# Example 2:
+# # Helper that can set default warning flags for you
+# target_set_warnings(${LIB_NAME}
+#   ENABLE ALL
+#   AS_ERROR ALL
+#   DISABLE Annoying)
+#
+# Example 3:
+# # Treat third-party library fmtlib as a system include as to ignore the warnings
+# target_set_warnings(fmt DISABLE ALL)
+#
+#  ENABLE
+#    * ALL: means all the warnings possible to enable through a one parameter switch.
+#      Note that for some compilers, this does not mean every single warning will be enabled (GCC for instance).
+#    * Any other name: enable the warning with the given name
+#
+#  DISABLE
+#    * ALL: will override any other settings and this target INTERFACE includes will be considered as system includes by targets linking it.
+#    * Annoying: Warnings that the author thinks should only be used as static analysis tools not in production. On MSVC, also sets _CRT_SECURE_NO_WARNINGS.
+#    * Any other name: disable the warning with the given name
+#
+#  AS_ERROR
+#    * ALL: is the only option available as not all compilers let us set specific warnings as error from command line (MSVC).
+#
+function(target_set_warnings)
+  #
+  if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+    set(WMSVC TRUE)
+    # Means the warning will be available at all levels that do emit warnings
+    set(WARNING_ENABLE_PREFIX "/w1")
+    set(WARNING_DISABLE_PREFIX "/wd")
+  elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    set(WGCC TRUE)
+    set(WARNING_ENABLE_PREFIX "-W")
+    set(WARNING_DISABLE_PREFIX "-Wno-")
+  elseif ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+    set(WCLANG TRUE)
+    set(WARNING_ENABLE_PREFIX "-W")
+    set(WARNING_DISABLE_PREFIX "-Wno-")
+  endif()
+  #
+  set(multiValueArgs
+    ENABLE
+    DISABLE
+    AS_ERROR)
+  cmake_parse_arguments(ARGUMENTS "" "" "${multiValueArgs}" ${ARGN})
+  #
+  # ALL: means all the warnings possible to enable through a one parameter switch.
+  list(FIND ARGUMENTS_ENABLE "ALL" enable_all)
+  #
+  # ALL: will override any other settings and this target INTERFACE includes will be considered as system includes by targets linking it.
+  list(FIND ARGUMENTS_DISABLE "ALL" disable_all)
+  #
+  # ALL: is the only option available as not all compilers let us set specific warnings as error from command line (MSVC).
+  list(FIND ARGUMENTS_AS_ERROR "ALL" as_error_all)
+  #
+  if(NOT ${enable_all} EQUAL -1) # enable all warnings
+    if(WMSVC)
+      # Not all the warnings, but WAll is unusable when using libraries
+      # Unless you'd like to support MSVC in the code with pragmas, this is probably the best option
+      list(APPEND WarningFlags
+        "/W4")
+    elseif(WGCC)
+      list(APPEND WarningFlags
+        "-Wall"
+        "-Wextra"
+        "-Wpedantic")
+    elseif(WCLANG)
+      list(APPEND WarningFlags
+        "-Wall"
+        "-Weverything"
+        "-Wpedantic")
+    endif()
+  elseif(NOT ${disable_all} EQUAL -1) # disable all warnings
+    # Treat includes as if coming from system to suppress warnings
+    # see https://stackoverflow.com/a/52136398
+    set(SystemIncludes TRUE)
+    if(WMSVC)
+      list(APPEND WarningFlags
+        "/w"
+        "/W0")
+    elseif(WGCC OR WCLANG)
+      list(APPEND WarningFlags
+        "-w")
+    endif()
+  endif()
+  #
+  list(FIND ARGUMENTS_DISABLE "Annoying" disable_annoying)
+  if(NOT ${disable_annoying} EQUAL -1) # disable annoying warnings
+    if(WMSVC)
+      # bounds-checked functions require to set __STDC_WANT_LIB_EXT1__ which we usually don't need/want
+      list(APPEND WarningDefinitions
+        -D_CRT_SECURE_NO_WARNINGS)
+      # disable C4514 C4710 C4711... Those are useless to add most of the time
+      #list(APPEND WarningFlags "/wd4514" "/wd4710" "/wd4711")
+      #list(APPEND WarningFlags "/wd4365") #signed/unsigned mismatch
+      #list(APPEND WarningFlags "/wd4668") # is not defined as a preprocessor macro, replacing with '0' for
+    elseif(WGCC OR WCLANG)
+      list(APPEND WarningFlags
+        -Wno-switch-enum)
+      if(WCLANG)
+        list(APPEND WarningFlags
+          -Wno-global-constructors
+          -Wno-exit-time-destructors
+          -Wno-documentation
+          -Wno-documentation-unknown-command
+          -Wno-unknown-warning-option
+          -Wno-padded
+          -Wno-undef
+          -Wno-reserved-id-macro
+          -Wno-inconsistent-missing-destructor-override
+          -fcomment-block-commands=test,retval)
+        if(NOT CMAKE_CXX_STANDARD EQUAL 98)
+          list(APPEND WarningFlags
+            -Wno-c++98-compat
+            -Wno-c++98-compat-pedantic)
+        endif()
+        if ("${CMAKE_CXX_SIMULATE_ID}" STREQUAL "MSVC")
+          # clang-cl has some VCC flags by default that it will not recognize...
+          list(APPEND WarningFlags
+            -Wno-unused-command-line-argument)
+        endif()
+      endif(WCLANG)
+    endif()
+  endif()
+  #
+  if(NOT ${as_error_all} EQUAL -1) # error on warnings
+    if(WMSVC)
+      list(APPEND WarningFlags "/WX")
+    elseif(WGCC OR WCLANG)
+      list(APPEND WarningFlags "-Werror")
+    endif()
+  endif()
+  #
+  if(ARGUMENTS_ENABLE)
+    # `ALL` is invalid warning name
+    list(REMOVE_ITEM ARGUMENTS_ENABLE ALL)
+    # Any other name: enable the warning with the given name
+    foreach(warning-name IN LISTS ARGUMENTS_ENABLE)
+      list(APPEND WarningFlags "${WARNING_ENABLE_PREFIX}${warning-name}")
+    endforeach()
+  endif()
+  #
+  if(ARGUMENTS_DISABLE)
+    # `ALL` is invalid warning name
+    list(REMOVE_ITEM ARGUMENTS_DISABLE ALL Annoying)
+    # Any other name: disable the warning with the given name
+    foreach(warning-name IN LISTS ARGUMENTS_DISABLE)
+      list(APPEND WarningFlags "${WARNING_DISABLE_PREFIX}${warning-name}")
+    endforeach()
+  endif()
+  #
+  # ARGUMENTS_UNPARSED_ARGUMENTS holds target names
+  foreach(target IN LISTS ARGUMENTS_UNPARSED_ARGUMENTS)
+    if(WarningFlags)
+      target_compile_options(${target} PRIVATE ${WarningFlags})
+    endif()
+    if(WarningDefinitions)
+      target_compile_definitions(${target} PRIVATE ${WarningDefinitions})
+    endif()
+    if(SystemIncludes)
+      # declare imported targets as system to suppress warnings
+      # see https://stackoverflow.com/a/52136398
+      set_target_properties(${target} PROPERTIES
+          INTERFACE_SYSTEM_INCLUDE_DIRECTORIES $<TARGET_PROPERTY:${target},INTERFACE_INCLUDE_DIRECTORIES>)
+    endif()
+  endforeach()
+endfunction(target_set_warnings)
+
+################################################################################
+# Link Time Optimization
+################################################################################
+#
+# Usage :
+#
+# Variable : ENABLE_LTO | Enable or disable LTO support for this build
+#
+# find_lto(lang)
+# - lang is C or CXX (the language to test LTO for)
+# - call it after project() so that the compiler is already detected
+#
+# This will check for LTO support and create a target_enable_lto(target [debug,optimized,general]) macro.
+# The 2nd parameter has the same meaning as in target_link_libraries, and is used to enable LTO only for those build configurations
+# 'debug' is by default the Debug configuration, and 'optimized' all the other configurations
+#
+# if ENABLE_LTO is set to false, an empty macro will be generated
+#
+# Then to enable LTO for your target use
+#
+#       target_enable_lto(mytarget general)
+#
+# It is however recommended to use it only for non debug builds the following way :
+#
+#       target_enable_lto(mytarget optimized)
+#
+# Note : For CMake versions < 3.9, target_link_library is used in it's non plain version.
+#        You will need to specify PUBLIC/PRIVATE/INTERFACE to all your other target_link_library calls for the target
+#
+# WARNING for cmake versions older than 3.9 :
+# This module will override CMAKE_AR CMAKE_RANLIB and CMAKE_NM by the gcc versions if found when building with gcc
+#
+
+macro(find_lto lang)
+  if(LTO_${lang}_CHECKED)
+
+    #LTO support was added for clang/gcc in 3.9
+    if(${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} VERSION_LESS 3.9)
+        cmake_policy(SET CMP0054 NEW)
+    message(STATUS "Checking for LTO Compatibility")
+        # Since GCC 4.9 we need to use gcc-ar / gcc-ranlib / gcc-nm
+        if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+            if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT CMAKE_GCC_AR OR NOT CMAKE_GCC_RANLIB OR NOT CMAKE_GCC_NM)
+                find_program(CMAKE_GCC_AR NAMES
+                  "${_CMAKE_TOOLCHAIN_PREFIX}gcc-ar"
+                  "${_CMAKE_TOOLCHAIN_PREFIX}gcc-ar-${_version}"
+                  DOC "gcc provided wrapper for ar which adds the --plugin option"
+                )
+                find_program(CMAKE_GCC_RANLIB NAMES
+                  "${_CMAKE_TOOLCHAIN_PREFIX}gcc-ranlib"
+                  "${_CMAKE_TOOLCHAIN_PREFIX}gcc-ranlib-${_version}"
+                  DOC "gcc provided wrapper for ranlib which adds the --plugin option"
+                )
+                # Not needed, but at least stay coherent
+                find_program(CMAKE_GCC_NM NAMES
+                  "${_CMAKE_TOOLCHAIN_PREFIX}gcc-nm"
+                  "${_CMAKE_TOOLCHAIN_PREFIX}gcc-nm-${_version}"
+                  DOC "gcc provided wrapper for nm which adds the --plugin option"
+                )
+                mark_as_advanced(CMAKE_GCC_AR CMAKE_GCC_RANLIB CMAKE_GCC_NM)
+                set(CMAKE_LTO_AR ${CMAKE_GCC_AR})
+                set(CMAKE_LTO_RANLIB ${CMAKE_GCC_RANLIB})
+                set(CMAKE_LTO_NM ${CMAKE_GCC_NM})
+            endif()
+            if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+                set(CMAKE_LTO_AR ${CMAKE_AR})
+                set(CMAKE_LTO_RANLIB ${CMAKE_RANLIB})
+                set(CMAKE_LTO_NM ${CMAKE_NM})
+            endif()
+
+            if(CMAKE_LTO_AR AND CMAKE_LTO_RANLIB)
+              set(__lto_flags -flto)
+
+              if(NOT CMAKE_${lang}_COMPILER_VERSION VERSION_LESS 4.7)
+                list(APPEND __lto_flags -fno-fat-lto-objects)
+              endif()
+
+              if(NOT DEFINED CMAKE_${lang}_PASSED_LTO_TEST)
+                set(__output_dir "${CMAKE_PLATFORM_INFO_DIR}/LtoTest1${lang}")
+                file(MAKE_DIRECTORY "${__output_dir}")
+                set(__output_base "${__output_dir}/lto-test-${lang}")
+
+                execute_process(
+                  COMMAND ${CMAKE_COMMAND} -E echo "void foo() {}"
+                  COMMAND ${CMAKE_${lang}_COMPILER} ${__lto_flags} -c -xc -
+                    -o "${__output_base}.o"
+                  RESULT_VARIABLE __result
+                  ERROR_QUIET
+                  OUTPUT_QUIET
+                )
+
+                if("${__result}" STREQUAL "0")
+                  execute_process(
+                    COMMAND ${CMAKE_LTO_AR} cr "${__output_base}.a" "${__output_base}.o"
+                    RESULT_VARIABLE __result
+                    ERROR_QUIET
+                    OUTPUT_QUIET
+                  )
+                endif()
+
+                if("${__result}" STREQUAL "0")
+                  execute_process(
+                    COMMAND ${CMAKE_LTO_RANLIB} "${__output_base}.a"
+                    RESULT_VARIABLE __result
+                    ERROR_QUIET
+                    OUTPUT_QUIET
+                  )
+                endif()
+
+                if("${__result}" STREQUAL "0")
+                  execute_process(
+                    COMMAND ${CMAKE_COMMAND} -E echo "void foo(); int main() {foo();}"
+                    COMMAND ${CMAKE_${lang}_COMPILER} ${__lto_flags} -xc -
+                      -x none "${__output_base}.a" -o "${__output_base}"
+                    RESULT_VARIABLE __result
+                    ERROR_QUIET
+                    OUTPUT_QUIET
+                  )
+                endif()
+
+                if("${__result}" STREQUAL "0")
+                  set(__lto_found TRUE)
+                endif()
+
+                set(CMAKE_${lang}_PASSED_LTO_TEST
+                  ${__lto_found} CACHE INTERNAL
+                  "If the compiler passed a simple LTO test compile")
+              endif()
+              if(CMAKE_${lang}_PASSED_LTO_TEST)
+                message(STATUS "Checking for LTO Compatibility - works")
+                set(LTO_${lang}_SUPPORT TRUE CACHE BOOL "Do we have LTO support ?")
+                set(LTO_COMPILE_FLAGS -flto CACHE STRING "Link Time Optimization compile flags")
+                set(LTO_LINK_FLAGS -flto CACHE STRING "Link Time Optimization link flags")
+              else()
+                message(STATUS "Checking for LTO Compatibility - not working")
+              endif()
+
+            endif()
+          elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+              message(STATUS "Checking for LTO Compatibility - works (assumed for clang)")
+              set(LTO_${lang}_SUPPORT TRUE CACHE BOOL "Do we have LTO support ?")
+              set(LTO_COMPILE_FLAGS -flto CACHE STRING "Link Time Optimization compile flags")
+              set(LTO_LINK_FLAGS -flto CACHE STRING "Link Time Optimization link flags")
+          elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+              message(STATUS "Checking for LTO Compatibility - works")
+              set(LTO_${lang}_SUPPORT TRUE CACHE BOOL "Do we have LTO support ?")
+              set(LTO_COMPILE_FLAGS /GL CACHE STRING "Link Time Optimization compile flags")
+              set(LTO_LINK_FLAGS -LTCG:INCREMENTAL CACHE STRING "Link Time Optimization link flags")
+          else()
+              message(STATUS "Checking for LTO Compatibility - compiler not handled by module")
+          endif()
+          mark_as_advanced(LTO_${lang}_SUPPORT LTO_COMPILE_FLAGS LTO_LINK_FLAGS)
+
+
+          set(LTO_${lang}_CHECKED TRUE CACHE INTERNAL "" )
+
+          if(CMAKE_GCC_AR AND CMAKE_GCC_RANLIB AND CMAKE_GCC_NM)
+              # THIS IS HACKY BUT THERE IS NO OTHER SOLUTION ATM
+              set(CMAKE_AR ${CMAKE_GCC_AR} CACHE FILEPATH "Forcing gcc-ar instead of ar" FORCE)
+              set(CMAKE_NM ${CMAKE_GCC_NM} CACHE FILEPATH "Forcing gcc-nm instead of nm" FORCE)
+              set(CMAKE_RANLIB ${CMAKE_GCC_RANLIB} CACHE FILEPATH "Forcing gcc-ranlib instead of ranlib" FORCE)
+          endif()
+    endif(${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} VERSION_LESS 3.9)
+  endif(NOT LTO_${lang}_CHECKED)
+
+  #Special case for cmake older than 3.9, using a library for gcc/clang, but could setup the flags directly.
+  #Taking advantage of the [debug,optimized] parameter of target_link_libraries
+  if(${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} VERSION_LESS 3.9)
+    if(LTO_${lang}_SUPPORT)
+        if(NOT TARGET __enable_lto_tgt)
+            add_library(__enable_lto_tgt INTERFACE)
+        endif()
+        target_compile_options(__enable_lto_tgt INTERFACE ${LTO_COMPILE_FLAGS})
+        #this might not work for all platforms... in which case we'll have to set the link flags on the target directly
+        target_link_libraries(__enable_lto_tgt INTERFACE ${LTO_LINK_FLAGS} )
+        macro(target_enable_lto _target _build_configuration)
+            if(${_build_configuration} STREQUAL "optimized" OR ${_build_configuration} STREQUAL "debug" )
+                target_link_libraries(${_target} PRIVATE ${_build_configuration} __enable_lto_tgt)
+            else()
+                target_link_libraries(${_target} PRIVATE __enable_lto_tgt)
+            endif()
+        endmacro()
+    else()
+        #In old cmake versions, we can set INTERPROCEDURAL_OPTIMIZATION even if not supported by the compiler
+        #So if we didn't detect it, let cmake give it a try
+        set(__IPO_SUPPORTED TRUE)
+    endif()
+  else()
+      cmake_policy(SET CMP0069 NEW)
+      include(CheckIPOSupported)
+      # Optional IPO. Do not use IPO if it's not supported by compiler.
+      check_ipo_supported(RESULT __IPO_SUPPORTED OUTPUT output)
+      if(NOT __IPO_SUPPORTED)
+        message(STATUS "IPO is not supported or broken.")
+      else()
+        message(STATUS "IPO is supported !")
+      endif()
+  endif()
+  if(__IPO_SUPPORTED)
+    macro(target_enable_lto _target _build_configuration)
+        if(NOT ${_build_configuration} STREQUAL "debug" )
+            #enable for all configurations
+            set_target_properties(${_target} PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
+        endif()
+        if(${_build_configuration} STREQUAL "optimized" )
+            #blacklist debug configurations
+            set(__enable_debug_lto FALSE)
+        else()
+            #enable only for debug configurations
+            set(__enable_debug_lto TRUE)
+        endif()
+        get_property(DEBUG_CONFIGURATIONS GLOBAL PROPERTY DEBUG_CONFIGURATIONS)
+        if(NOT DEBUG_CONFIGURATIONS)
+            set(DEBUG_CONFIGURATIONS DEBUG) # This is what is done by CMAKE internally... since DEBUG_CONFIGURATIONS is empty by default
+        endif()
+        foreach(config IN LISTS DEBUG_CONFIGURATIONS)
+            set_target_properties(${_target} PROPERTIES INTERPROCEDURAL_OPTIMIZATION_${config} ${__enable_debug_lto})
+        endforeach()
+    endmacro()
+  endif()
+
+  if(NOT COMMAND target_enable_lto)
+      macro(target_enable_lto _target _build_configuration)
+      endmacro()
+  endif()
+endmacro()
+
+################################################################################
+# Coverage.
+################################################################################
+
+function(report_uninstalled PROGRAM)
+  message(FATAL_ERROR "Failed to process coverage option. Program '${PROGRAM}' has not been installed.")
+endfunction()
+
+# TODO: genhtml
+# https://github.com/blockspacer/CXCMake/blob/28da209d6c48997711908501ff8c33c79cd467e5/cmake/core/codecov/CXCMake_CodeCoverage.cmake
+# https://github.com/luk036/physdes/blob/846f70f74d5f1ebb774d8b1895fcae6b88660bbb/cmake/CodeCoverage.cmake
+# https://github.com/luk036/physdes/blob/846f70f74d5f1ebb774d8b1895fcae6b88660bbb/cmake/Coverage.cmake
+function(add_coverage)
+  # see https://cliutils.gitlab.io/modern-cmake/chapters/basics/functions.html
+  set(options
+    REQUIRED
+  )
+  set(oneValueArgs
+    VERBOSE
+    COVERAGE_DIR
+  )
+  set(multiValueArgs
+    # skip
+  )
+  #
+  cmake_parse_arguments(
+    ARGUMENTS # prefix of output variables
+    "${options}" # list of names of the boolean arguments (only defined ones will be true)
+    "${oneValueArgs}" # list of names of mono-valued arguments
+    "${multiValueArgs}" # list of names of multi-valued arguments (output variables are lists)
+    ${ARGN} # arguments of the function to parse, here we take the all original ones
+  )
+  #
+  set(args_unparsed ${ARGUMENTS_UNPARSED_ARGUMENTS})
+  if(${ARGUMENTS_VERBOSE})
+    message(STATUS
+      "validate: ARGUMENTS_UNPARSED_ARGUMENTS=${ARGUMENTS_UNPARSED_ARGUMENTS}")
+  endif(${ARGUMENTS_VERBOSE})
+
+  # Set coverage report directory
+  # default
+  set(COVERAGE_DIR
+    ${CMAKE_CURRENT_BINARY_DIR}/coverage
+  )
+  if(ARGUMENTS_COVERAGE_DIR)
+    set(COVERAGE_DIR
+      ${ARGUMENTS_COVERAGE_DIR}
+    )
+  endif(ARGUMENTS_COVERAGE_DIR)
+
+  # Set source directories
+  # set(SOURCE_SRC_DIR ${CMAKE_CURRENT_BINARY_DIR}/src)
+
+  file(MAKE_DIRECTORY ${COVERAGE_DIR})
+
+  # GNU compilers use gcov for coverage.
+  if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_COMPILER_IS_GNUCC)
+    # Check that gcovr is installed.
+    find_program_helper(gcovr
+      PATHS
+        ${CONAN_BIN_DIRS}
+        ${CONAN_BIN_DIRS_LLVM_TOOLS}
+      #NO_SYSTEM_ENVIRONMENT_PATH
+      #NO_CMAKE_SYSTEM_PATH
+      #${ARGUMENTS_UNPARSED_ARGUMENTS}
+      REQUIRED
+      OUT_VAR GCOVR
+      VERBOSE TRUE
+    )
+
+    # cgov documentation: https://gcc.gnu.org/onlinedocs/gcc/Gcov.html
+    # gcovr documentation: http://gcovr.com/guide.html
+    if(GCOVR)
+      set(CMAKE_CXX_OUTPUT_EXTENSION_REPLACE ON)
+
+      set(CMAKE_C_FLAGS
+        "-g -O0 --coverage"
+        CACHE INTERNAL "")
+
+      set(CMAKE_CXX_FLAGS
+        "-g -O0 --coverage"
+        CACHE INTERNAL "")
+
+      set(CMAKE_EXE_LINKER_FLAGS
+        "${CMAKE_EXE_LINKER_FLAGS} -g -O0 --coverage"
+        CACHE INTERNAL "")
+
+      set(CMAKE_STATIC_LINKER_FLAGS
+        "${CMAKE_EXE_LINKER_FLAGS} -g -O0 --coverage"
+        CACHE INTERNAL "")
+
+      set(CMAKE_SHARED_LINKER_FLAGS
+        "${CMAKE_SHARED_LINKER_FLAGS} -g -O0 --coverage"
+        CACHE INTERNAL "")
+
+      add_custom_target(coverage_${PROJECT_NAME}
+        gcovr
+          --root=${CMAKE_CURRENT_SOURCE_DIR}
+          .
+          --exclude-directories={test|doc|bench}
+          --html
+          --html-details
+          --output=${COVERAGE_DIR}/index.html
+          --object-directory=${CMAKE_CURRENT_BINARY_DIR}/impl
+          --delete
+          --print-summary
+          --exclude-unreachable-branches
+      )
+
+      add_dependencies(coverage coverage_${PROJECT_NAME})
+    else(GCOVR)
+      report_uninstalled("gcovr")
+    endif(GCOVR)
+
+  # LLVM compilers use llvm-cov for coverage.
+  elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    # Check that llvm-cov is installed.
+    find_program_helper(llvm-cov
+      PATHS
+        ${CONAN_BIN_DIRS}
+        ${CONAN_BIN_DIRS_LLVM_TOOLS}
+      #NO_SYSTEM_ENVIRONMENT_PATH
+      #NO_CMAKE_SYSTEM_PATH
+      #${ARGUMENTS_UNPARSED_ARGUMENTS}
+      REQUIRED
+      OUT_VAR LLVM_COV
+      VERBOSE TRUE
+    )
+
+    # llvm-cov documentation: https://llvm.org/docs/CommandGuide/llvm-cov.html
+    # llvm coverage documentation : https://clang.llvm.org/docs/SourceBasedCodeCoverage.html
+    if(LLVM_COV)
+      # Set profile output file name and directory.
+      set(ENV{LLVM_PROFILE_FILE}
+        ${COVERAGE_DIR}/coverage.profraw)
+
+      # llvm-profdata merge -sparse coverage.profraw -o coverage.profdata
+      # llvm-cov show ./foo -instr-profile=coverage.profdata -format=html -output-dir=${COVERAGE_DIR}
+
+      set(CMAKE_C_FLAGS
+        "-fprofile-instr-generate -fcoverage-mapping"
+        CACHE INTERNAL "")
+
+      set(CMAKE_CXX_FLAGS
+        "-fprofile-instr-generate -fcoverage-mapping"
+        CACHE INTERNAL "")
+
+      set(CMAKE_EXE_LINKER_FLAGS
+        "${CMAKE_EXE_LINKER_FLAGS} -fprofile-instr-generate -fcoverage-mapping"
+        CACHE INTERNAL "")
+
+      set(CMAKE_STATIC_LINKER_FLAGS
+        "${CMAKE_EXE_LINKER_FLAGS} -fprofile-instr-generate -fcoverage-mapping"
+        CACHE INTERNAL "")
+
+      set(CMAKE_SHARED_LINKER_FLAGS
+        "${CMAKE_SHARED_LINKER_FLAGS} -fprofile-instr-generate -fcoverage-mapping"
+        CACHE INTERNAL "")
+    else(LLVM_COV)
+      report_uninstalled("llvm-cov")
+    endif(LLVM_COV)
+  endif()
+endfunction(add_coverage)
+
+################################################################################
+# Doxygen.
+# TODO: create conan package https://github.com/mosra/m.css.git
+################################################################################
+
+# cached path to this file, forces refresh on each use
+unset(CXCMAKE_DOC_LIST_DIR CACHE)
+set(CXCMAKE_DOC_LIST_DIR "${CMAKE_CURRENT_LIST_DIR}"
+  CACHE STRING "(autogenerated) path to cmake file")
+
+macro(enable_doxygen_generator Doxyfile_mcss_path)
+  if(NOT DOXYGEN_FOUND)
+    message(FATAL_ERROR "Doxygen not found, unable to generate documentation")
+  endif()
+
+  if(NOT EXISTS "${m_css_executable}")
+    message(FATAL_ERROR "NOT FOUND: ${m_css_executable}")
+  endif(NOT EXISTS "${m_css_executable}")
+
+  # Add a hint to help Cmake to find the correct python version:
+  # (see https://cmake.org/cmake/help/v3.0/module/FindPythonInterp.html)
+  set(Python_ADDITIONAL_VERSIONS 3)
+  # You can set -DPYTHON_EXECUTABLE=/usr/bin/python3
+  find_package(PythonInterp 3 REQUIRED)
+  if(NOT PYTHONINTERP_FOUND)
+    message(FATAL_ERROR "Python 3 not found, unable to generate documentation")
+  endif()
+
+  # create dirs
+  add_custom_command(
+    OUTPUT ${DOXY_NO_THEME_OUTPUT_DIR}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${DOXY_NO_THEME_OUTPUT_DIR}
+    COMMENT "Creating documentation directory for ${CMAKE_PROJECT_NAME}"
+  )
+
+  # configure Doxyfile.in
+  add_custom_command(
+    OUTPUT ${doxy_file} # this line links the command to below add_custom_target
+    COMMAND ${CMAKE_COMMAND}
+            -D "DOXY_TEMPLATE=${doxy_template}"
+            -D "DOXY_DOC_DEST_DIR=${DOXY_DOC_DEST_DIR}"
+            -D "DOXY_PROJECT_NAME=${DOXY_PROJECT_NAME}"
+            -D "DOXY_PROJECT_VER=${DOXY_PROJECT_VER}"
+            -D "DOXY_DOC_INPUT_ROOT_DIRS=${DOXY_DOC_INPUT_ROOT_DIRS}"
+            -D "DOXY_DOC_EXCLUDE_PATTERNS_DIRS=${DOXY_DOC_EXCLUDE_PATTERNS_DIRS}"
+            -D "DOXY_DOC_COMMON_IMG_PATH=${DOXY_DOC_COMMON_IMG_PATH}"
+            -D "DOXY_FILE=${doxy_file}"
+            -D "DOXY_ROOT_DIR=${DOXY_ROOT_DIR}"
+            -D "DOXY_STRIP_FROM_PATH=${DOXY_ROOT_DIR}"
+            -D "DOXY_OUTPUT_DIR=${DOXY_NO_THEME_OUTPUT_DIR}"
+            -P ${CXCMAKE_DOC_LIST_DIR}/configure_doxygen.cmake
+    DEPENDS ${DOXY_NO_THEME_OUTPUT_DIR}
+    COMMENT "Generating Doxyfile for ${CMAKE_PROJECT_NAME}"
+  )
+
+  # copy DOXYMCSS_SRC to DOXYMCSS_DST
+  add_custom_command(
+    OUTPUT ${doxy_mcss_file}
+    COMMAND ${CMAKE_COMMAND}
+            -D "DOXYMCSS_SRC=${Doxyfile_mcss_path}"
+            -D "DOXYMCSS_DST=${DOXY_MCSS_OUTPUT_DIR}"
+            -P ${CXCMAKE_DOC_LIST_DIR}/create_doxy_mcss.cmake
+    COMMENT "Generating Doxyfile-mcss for ${CMAKE_PROJECT_NAME}"
+  )
+
+  # build docs with mcss theme
+  add_custom_command(
+    OUTPUT ${DOXY_MCSS_OUTPUT_DIR}/html
+    COMMAND ${PYTHON_EXECUTABLE} ${m_css_executable} --debug ${doxy_mcss_file}
+    WORKING_DIRECTORY ${DOXY_ROOT_DIR}
+    DEPENDS ${doxy_file} ${doxy_mcss_file}
+    COMMENT "Creating documentation for ${CMAKE_PROJECT_NAME}"
+  )
+
+  # build docs in standard theme
+  add_custom_target(doxyDoc_notheme
+    COMMAND ${DOXYGEN_EXECUTABLE} "${DOXY_NO_THEME_OUTPUT_DIR}/Doxyfile"
+    WORKING_DIRECTORY ${CMAKE_HOME_DIRECTORY}
+    DEPENDS ${doxy_file} ${doxy_mcss_file}
+    COMMENT "Building user's documentation into doxyDoc build dir..."
+  )
+
+  # build both mcss and standard theme
+  add_custom_target(doxyDoc ALL
+    DEPENDS
+    ${DOXY_NO_THEME_OUTPUT_DIR}
+    ${DOXY_MCSS_OUTPUT_DIR}
+    ${doxy_file}
+    ${doxy_mcss_file}
+    ${DOXY_MCSS_OUTPUT_DIR}/html
+    # doxyDoc_notheme
+  )
+
+  install(DIRECTORY ${DOXY_NO_THEME_OUTPUT_DIR}
+    DESTINATION share/doc
+    COMPONENT docs
+    # OPTIONAL here means `do not raise an error if target file/dir not found`
+    OPTIONAL)
+endmacro(enable_doxygen_generator)
+
+################################################################################
+# GDB
+################################################################################
+
+# Helper macro for creating convenient targets
+find_program(GDB_PATH gdb)
+
+# Adds -run and -dbg targets
+macro(addRunAndDebugTargets TARGET)
+  add_custom_target(${TARGET}-run
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    USES_TERMINAL
+    DEPENDS ${TARGET}
+    COMMAND ./${TARGET})
+
+  # convenience run gdb target
+  if(GDB_PATH)
+    add_custom_target(${TARGET}-gdb
+      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+      USES_TERMINAL
+      DEPENDS ${TARGET}
+      COMMAND ${GDB_PATH} ./${TARGET})
+  endif()
+endmacro()
+
+################################################################################
+# Uninstall (using install_manifest.txt)
+################################################################################
+
+# cached path to this file, forces refresh on each use
+unset(CXCMAKE_UNINSTALL_LIST_DIR CACHE)
+set(CXCMAKE_UNINSTALL_LIST_DIR "${CMAKE_CURRENT_LIST_DIR}"
+  CACHE STRING "(autogenerated) path to cmake file")
+
+# see https://gitlab.kitware.com/cmake/community/wikis/FAQ#can-i-do-make-uninstall-with-cmake
+macro(addinstallManifest)
+  configure_file(
+    "${CXCMAKE_UNINSTALL_LIST_DIR}/Uninstall.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/Uninstall.cmake"
+    IMMEDIATE @ONLY)
+  add_custom_target(uninstall
+    COMMAND
+      ${CMAKE_COMMAND}
+      -P ${CMAKE_CURRENT_BINARY_DIR}/Uninstall.cmake)
+endmacro()
