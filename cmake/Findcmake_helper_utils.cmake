@@ -23,7 +23,8 @@ macro(findPackageCrossPlatform)
   elseif(CMAKE_HOST_UNIX)
     find_package(${ARGN})
   else()
-      message( "Unknown platform, using find_package" )
+      message( STATUS
+        "Unknown platform, using find_package" )
       find_package(${ARGN})
   endif()
 endmacro(findPackageCrossPlatform)
@@ -126,6 +127,17 @@ function(validate_out_dirs)
       ${CMAKE_BINARY_DIR}/bin)
   endif()
 endfunction(validate_out_dirs)
+
+# EXAMPLE:
+# validate_out_source_build(FATAL_ERROR)
+function(validate_out_source_build _MSG_TYPE)
+  if(PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)
+    message(${_MSG_TYPE}
+      "In-source builds not allowed. \
+      Please make a new directory (called a build directory) \
+      and run CMake from there.")
+  endif()
+endfunction(validate_out_source_build)
 
 ## ---------------------------- cppcheck -------------------------------- ##
 
