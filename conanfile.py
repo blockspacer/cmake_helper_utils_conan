@@ -182,3 +182,6 @@ class cmake_helper_utils_conan_project(ConanFile):
 
         #self.cpp_info.libs = tools.collect_libs(self)
         #self.cpp_info.defines.append('PDFLIB_DLL')
+
+    def package_id(self):
+        self.info.header_only()
