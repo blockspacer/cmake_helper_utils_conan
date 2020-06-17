@@ -3227,7 +3227,9 @@ macro(compile_with_llvm_tools)
   )
 
   # use llvm_tools from conan
-  find_program_helper(llvm-ld
+  find_program_helper(
+    # llvm-ld replaced by llvm-ld
+    ld.lld
     PATHS
       #${CONAN_BIN_DIRS}
       ${CONAN_BIN_DIRS_LLVM_TOOLS}
@@ -3278,12 +3280,236 @@ macro(compile_with_llvm_tools)
     VERBOSE TRUE
   )
 
+  # use llvm_tools from conan
+  find_program_helper(llvm-as
+    PATHS
+      #${CONAN_BIN_DIRS}
+      ${CONAN_BIN_DIRS_LLVM_TOOLS}
+    NO_SYSTEM_ENVIRONMENT_PATH
+    NO_CMAKE_SYSTEM_PATH
+    ${ARGUMENTS_UNPARSED_ARGUMENTS}
+    REQUIRED
+    OUT_VAR LLVM_ASM_PROGRAM
+    VERBOSE TRUE
+  )
+
+  # use llvm_tools from conan
+  find_program_helper(llvm-rc # TODO: llvm-rc-rc or llvm-rc?
+    PATHS
+      #${CONAN_BIN_DIRS}
+      ${CONAN_BIN_DIRS_LLVM_TOOLS}
+    NO_SYSTEM_ENVIRONMENT_PATH
+    NO_CMAKE_SYSTEM_PATH
+    ${ARGUMENTS_UNPARSED_ARGUMENTS}
+    REQUIRED
+    OUT_VAR LLVM_RC_PROGRAM
+    VERBOSE TRUE
+  )
+
   # Set linkers and other build tools.
+  # Related documentation
+  # https://cmake.org/cmake/help/latest/variable/CMAKE_LANG_COMPILER.html
+  # https://cmake.org/cmake/help/latest/variable/CMAKE_LANG_FLAGS_INIT.html
+  # https://cmake.org/cmake/help/latest/variable/CMAKE_LINKER.html
+  # https://cmake.org/cmake/help/latest/variable/CMAKE_AR.html
+  # https://cmake.org/cmake/help/latest/variable/CMAKE_RANLIB.html
   set(CMAKE_AR      "${LLVM_AR_PROGRAM}")
   set(CMAKE_LINKER  "${LLVM_LD_PROGRAM}")
   set(CMAKE_NM      "${LLVM_NM_PROGRAM}")
   set(CMAKE_OBJDUMP "${LLVM_OBJDUMP_PROGRAM}")
   set(CMAKE_RANLIB  "${LLVM_RANLIB_PROGRAM}")
+  set(CMAKE_ASM_COMPILER  "${LLVM_ASM_PROGRAM}")
+  set(CMAKE_RC_COMPILER  "${LLVM_RC_PROGRAM}")
+
+  #  -lc++abi -Wno-unused-command-line-argument
+  set(CMAKE_C_FLAGS
+    "${CMAKE_C_FLAGS} \
+    -stdlib=libc++")
+
+  set(CMAKE_CXX_FLAGS
+    "${CMAKE_CXX_FLAGS} \
+    -stdlib=libc++")
+
+  link_libraries("-stdlib=libc++ -lc++abi -lc++ -lm -lc")
+
+  # Set compiler flags
+  #set(CMAKE_STATIC_LINKER_FLAGS
+  #  "${CMAKE_STATIC_LINKER_FLAGS} \
+  #  -lc++abi -lc++ -lm -lc")
+  ##
+  #set(CMAKE_SHARED_LINKER_FLAGS
+  #  "${CMAKE_SHARED_LINKER_FLAGS} \
+  #  -lc++abi -lc++ -lm -lc")
+
+  set(CMAKE_EXE_LINKER_FLAGS
+    "${CMAKE_EXE_LINKER_FLAGS} \
+    -stdlib=libc++ -lc++abi -lc++ -lm -lc")
+
+  # use llvm_tools from conan
+  find_library(CLANG_LIBCPP
+    NAMES
+      c++
+    PATHS
+      ${CONAN_LIB_DIRS_LLVM_TOOLS}
+      ${CONAN_BIN_DIRS_LLVM_TOOLS}
+    NO_SYSTEM_ENVIRONMENT_PATH
+    NO_CMAKE_SYSTEM_PATH
+  )
+  if(NOT CLANG_LIBCPP)
+    message(FATAL_ERROR
+      "Unable to find libc++")
+  endif(NOT CLANG_LIBCPP)
+  get_filename_component(CLANG_LIBCPP_DIR
+    ${CLANG_LIBCPP}
+    DIRECTORY)
+  message(STATUS
+    "CLANG_LIBCPP_DIR=${CLANG_LIBCPP_DIR}")
+  if(NOT IS_ABSOLUTE ${CLANG_LIBCPP_DIR})
+    message(FATAL_ERROR
+      "Path to libc++ must be absolute")
+  endif(NOT IS_ABSOLUTE ${CLANG_LIBCPP_DIR})
+  #
+  # Set compiler flags
+  # FIXME: argument unused during compilation
+  #set(CMAKE_CXX_FLAGS
+  #  "${CMAKE_CXX_FLAGS} \
+  #  -L${CLANG_LIBCPP_DIR}")
+  # FIXME: 'linker' input unused CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG
+  ##
+  #set(CMAKE_LD_FLAGS
+  #  "${CMAKE_LD_FLAGS} \
+  #  -Wl,-rpath,${CONAN_LLVM_TOOLS_ROOT}/lib \
+  #  -Wl,-rpath,${CLANG_LIBCPP_DIR}")
+  #
+  #set(CMAKE_STATIC_LINKER_FLAGS
+  #  "${CMAKE_STATIC_LINKER_FLAGS} \
+  #  -Wl,-rpath,${CONAN_LLVM_TOOLS_ROOT}/lib \
+  #  -Wl,-rpath,${CLANG_LIBCPP_DIR}")
+  ###
+  #set(CMAKE_SHARED_LINKER_FLAGS
+  #  "${CMAKE_SHARED_LINKER_FLAGS} \
+  #  -Wl,-rpath,${CONAN_LLVM_TOOLS_ROOT}/lib \
+  #  -Wl,-rpath,${CLANG_LIBCPP_DIR}")
+  ###
+  #set(CMAKE_EXE_LINKER_FLAGS
+  #  "${CMAKE_EXE_LINKER_FLAGS} \
+  #  -Wl,-rpath,${CONAN_LLVM_TOOLS_ROOT}/lib \
+  #  -Wl,-rpath,${CLANG_LIBCPP_DIR}")
+
+  # use llvm_tools from conan
+  find_library(CLANG_LIBCPPABI
+    NAMES
+    c++abi
+    PATHS
+      ${CONAN_LIB_DIRS_LLVM_TOOLS}
+      ${CONAN_BIN_DIRS_LLVM_TOOLS}
+    NO_SYSTEM_ENVIRONMENT_PATH
+    NO_CMAKE_SYSTEM_PATH
+  )
+  if(NOT CLANG_LIBCPPABI)
+    message(FATAL_ERROR
+      "Unable to find libc++abi")
+  endif(NOT CLANG_LIBCPPABI)
+  get_filename_component(CLANG_LIBCPPABI_DIR
+    ${CLANG_LIBCPPABI}
+    DIRECTORY)
+  message(STATUS
+    "CLANG_LIBCPPABI_DIR=${CLANG_LIBCPPABI_DIR}")
+  if(NOT IS_ABSOLUTE ${CLANG_LIBCPPABI_DIR})
+    message(FATAL_ERROR
+      "Path to libc++abi must be absolute")
+  endif(NOT IS_ABSOLUTE ${CLANG_LIBCPPABI_DIR})
+  #
+  # FIXME: 'linker' input unused
+  # Set compiler flags
+  #set(CMAKE_CXX_FLAGS
+  #  "${CMAKE_CXX_FLAGS} \
+  #  -L${CLANG_LIBCPPABI_DIR} \
+  #  -Wl,-rpath,${CONAN_LLVM_TOOLS_ROOT}/lib \
+  #  -Wl,-rpath,${CLANG_LIBCPPABI_DIR}")
+
+  # -isystem /path/to/libcxx_msan/include
+  # -isystem /path/to/libcxx_msan/include/c++/v1
+  find_path(
+    LIBCXX_LIBCXXABI_INCLUDE_FILE cxxabi.h
+    PATHS
+      ${CONAN_LLVM_TOOLS_ROOT}/include/c++/v1
+      ${CONAN_INCLUDE_DIRS_LLVM_TOOLS}
+    NO_DEFAULT_PATH
+    NO_CMAKE_FIND_ROOT_PATH
+  )
+  if(NOT LIBCXX_LIBCXXABI_INCLUDE_FILE)
+    message(FATAL_ERROR
+      "Unable to find cxxabi.h")
+  endif(NOT LIBCXX_LIBCXXABI_INCLUDE_FILE)
+  get_filename_component(LIBCXX_LIBCXXABI_INCLUDE_FILE_DIR
+    ${LIBCXX_LIBCXXABI_INCLUDE_FILE}
+    DIRECTORY)
+  message(STATUS
+    "LIBCXX_LIBCXXABI_INCLUDE_FILE_DIR=${LIBCXX_LIBCXXABI_INCLUDE_FILE_DIR}")
+  if(NOT IS_ABSOLUTE ${LIBCXX_LIBCXXABI_INCLUDE_FILE_DIR})
+    message(FATAL_ERROR
+      "Path to cxxabi.h must be absolute")
+  endif(NOT IS_ABSOLUTE ${LIBCXX_LIBCXXABI_INCLUDE_FILE_DIR})
+  if("${CONAN_LLVM_TOOLS_ROOT}" STREQUAL "")
+    message(FATAL_ERROR
+      "CONAN_LLVM_TOOLS_ROOT not found")
+  endif()
+  # Set compiler flags
+  # FIXME: gtest.h:57
+  # error: no member named 'abort' in namespace 'std'
+  # -isystem ${CONAN_LLVM_TOOLS_ROOT}/include/c++/v1
+  #set(CMAKE_CXX_FLAGS
+  #  "${CMAKE_CXX_FLAGS} \
+  #  -isystem ${LIBCXX_LIBCXXABI_INCLUDE_FILE_DIR} \
+  #  -isystem ${CONAN_LLVM_TOOLS_ROOT}/include")
+
+  include_directories(
+    "${CONAN_LLVM_TOOLS_ROOT}/include"
+    "${CONAN_LLVM_TOOLS_ROOT}/include/c++/v1")
+
+  #set(CMAKE_C_FLAGS
+  #  "${CMAKE_C_FLAGS} \
+  #  -I${CONAN_LLVM_TOOLS_ROOT}/include/c++/v1 \
+  #  -I${CONAN_LLVM_TOOLS_ROOT}/include")
+
+  set(CMAKE_CXX_FLAGS
+    "${CMAKE_CXX_FLAGS} \
+    -I${CONAN_LLVM_TOOLS_ROOT}/include/c++/v1 \
+    -I${CONAN_LLVM_TOOLS_ROOT}/include")
+
+  link_directories("${CONAN_LLVM_TOOLS_ROOT}/lib")
+  link_directories("${CLANG_LIBCPP_DIR}")
+
+  #set(CMAKE_C_FLAGS
+  #  "${CMAKE_C_FLAGS} \
+  #  -L${CONAN_LLVM_TOOLS_ROOT}/lib \
+  #  -L${CLANG_LIBCPP_DIR}")
+
+  # see https://github.com/GMLC-TDC/helics-buildenv/blob/7b9de98d18960fd9959e102935c694597b85b1af/sanitizers/Dockerfile#L61
+  #-l~/.conan/data/llvm_tools/master/conan/stable/package/#0317bac93bec74216c947d1359dc7160e8dce7c1/lib/libc++.a \
+  #-l~/.conan/data/llvm_tools/master/conan/stable/package/#0317bac93bec74216c947d1359dc7160e8dce7c1/lib/libc++abi.a
+  # TODO: remove -std=c++17
+  set(CMAKE_CXX_FLAGS
+    "${CMAKE_CXX_FLAGS} \
+    -Wno-unused-command-line-argument \
+    -L${CONAN_LLVM_TOOLS_ROOT}/lib \
+    -L${CLANG_LIBCPP_DIR} \
+    -Wl,-rpath,${CLANG_LIBCPPABI_DIR} \
+    -Wl,-rpath,${CONAN_LLVM_TOOLS_ROOT}/lib \
+    -stdlib=libc++ -lc++abi -lc++ -lm -lc -fuse-ld=lld")
+
+  # -nostdinc++ makes '-stdlib=libc++' unused.
+  add_compile_options(
+      "-stdlib=libc++"
+      "-lc++abi"
+      "-nostdinc++"
+      "-nodefaultlibs"
+      "-v")
+
+  #add_definitions(-std=c++17) # TODO: remove -std=c++17
+
+  #MSAN_CFLAGS="-fsanitize=memory -stdlib=libc++ -L/root/develop/libcxx_msan/lib -lc++abi -I/root/develop/libcxx_msan/include -I/root/develop/libcxx_msan/include/c++/v1 -Wno-unused-command-line-argument -fno-omit-frame-pointer -g -O1 -Wl,-rpath=/root/develop/libcxx_msan/lib"
 endmacro(compile_with_llvm_tools)
 
 ################################################################################
@@ -3361,15 +3587,23 @@ macro(add_gold_linker)
         ERROR_QUIET)
     if("${stdout}" MATCHES "GNU gold")
       set(CMAKE_C_FLAGS
-        "${CMAKE_C_FLAGS} -fuse-ld=gold")
+        "${CMAKE_C_FLAGS} \
+        -fuse-ld=gold")
       set(CMAKE_CXX_FLAGS
-        "${CMAKE_CXX_FLAGS} -fuse-ld=gold")
+        "${CMAKE_CXX_FLAGS} \
+        -fuse-ld=gold")
+      set(CMAKE_LD_FLAGS
+        "${CMAKE_LD_FLAGS} \
+        -fuse-ld=gold -Wl,--disable-new-dtags")
       set(CMAKE_EXE_LINKER_FLAGS
-        "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=gold -Wl,--disable-new-dtags")
+        "${CMAKE_EXE_LINKER_FLAGS} \
+        -fuse-ld=gold -Wl,--disable-new-dtags")
       set(CMAKE_STATIC_LINKER_FLAGS
-        "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=gold -Wl,--disable-new-dtags")
+        "${CMAKE_STATIC_LINKER_FLAGS} \
+        -fuse-ld=gold -Wl,--disable-new-dtags")
       set(CMAKE_SHARED_LINKER_FLAGS
-        "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=gold -Wl,--disable-new-dtags")
+        "${CMAKE_SHARED_LINKER_FLAGS} \
+        -fuse-ld=gold -Wl,--disable-new-dtags")
       message(STATUS
         "Using GNU gold linker.")
     elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -3380,6 +3614,8 @@ macro(add_gold_linker)
       # TODO: -flto: This flag will also cause clang to look for the gold plugin in the lib directory under its prefix and pass the -plugin option to ld.
       set(CMAKE_EXE_LINKER_FLAGS
         "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=lld")
+      set(CMAKE_SHARED_LINKER_FLAGS
+        "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=lld")
       message(STATUS
         "Using Clang lld instead of gold linker
         because the LLVM linker is faster.")
@@ -3886,25 +4122,26 @@ function(add_coverage)
       set(CMAKE_CXX_OUTPUT_EXTENSION_REPLACE ON)
 
       set(CMAKE_C_FLAGS
-        "-g -O0 --coverage"
-        CACHE INTERNAL "")
+        "${CMAKE_C_FLAGS} \
+        -g -O0 --coverage")
 
       set(CMAKE_CXX_FLAGS
-        "-g -O0 --coverage"
-        CACHE INTERNAL "")
+        "${CMAKE_CXX_FLAGS} \
+        -g -O0 --coverage")
 
       set(CMAKE_EXE_LINKER_FLAGS
-        "${CMAKE_EXE_LINKER_FLAGS} -g -O0 --coverage"
-        CACHE INTERNAL "")
+        "${CMAKE_EXE_LINKER_FLAGS} \
+        -g -O0 --coverage")
 
       set(CMAKE_STATIC_LINKER_FLAGS
-        "${CMAKE_EXE_LINKER_FLAGS} -g -O0 --coverage"
-        CACHE INTERNAL "")
+        "${CMAKE_STATIC_LINKER_FLAGS} \
+        -g -O0 --coverage")
 
       set(CMAKE_SHARED_LINKER_FLAGS
-        "${CMAKE_SHARED_LINKER_FLAGS} -g -O0 --coverage"
-        CACHE INTERNAL "")
+        "${CMAKE_SHARED_LINKER_FLAGS} \
+        -g -O0 --coverage")
 
+      # TODO: custom --exclude-directories
       add_custom_target(coverage_${PROJECT_NAME}
         gcovr
           --root=${CMAKE_CURRENT_SOURCE_DIR}
@@ -3950,24 +4187,28 @@ function(add_coverage)
       # llvm-cov show ./foo -instr-profile=coverage.profdata -format=html -output-dir=${COVERAGE_DIR}
 
       set(CMAKE_C_FLAGS
-        "-fprofile-instr-generate -fcoverage-mapping"
-        CACHE INTERNAL "")
+        "${CMAKE_C_FLAGS} \
+        -fprofile-instr-generate -fcoverage-mapping")
 
       set(CMAKE_CXX_FLAGS
-        "-fprofile-instr-generate -fcoverage-mapping"
-        CACHE INTERNAL "")
+        "${CMAKE_CXX_FLAGS} \
+        -fprofile-instr-generate -fcoverage-mapping")
+
+      set(CMAKE_LD_FLAGS
+        "${CMAKE_LD_FLAGS} \
+        -fprofile-instr-generate -fcoverage-mapping")
 
       set(CMAKE_EXE_LINKER_FLAGS
-        "${CMAKE_EXE_LINKER_FLAGS} -fprofile-instr-generate -fcoverage-mapping"
-        CACHE INTERNAL "")
+        "${CMAKE_EXE_LINKER_FLAGS} \
+        -fprofile-instr-generate -fcoverage-mapping")
 
       set(CMAKE_STATIC_LINKER_FLAGS
-        "${CMAKE_EXE_LINKER_FLAGS} -fprofile-instr-generate -fcoverage-mapping"
-        CACHE INTERNAL "")
+        "${CMAKE_EXE_LINKER_FLAGS} \
+        -fprofile-instr-generate -fcoverage-mapping")
 
       set(CMAKE_SHARED_LINKER_FLAGS
-        "${CMAKE_SHARED_LINKER_FLAGS} -fprofile-instr-generate -fcoverage-mapping"
-        CACHE INTERNAL "")
+        "${CMAKE_SHARED_LINKER_FLAGS} \
+        -fprofile-instr-generate -fcoverage-mapping")
     else(LLVM_COV)
       report_uninstalled("llvm-cov")
     endif(LLVM_COV)
