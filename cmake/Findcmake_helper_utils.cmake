@@ -3710,18 +3710,82 @@ function(target_set_warnings)
     if(WMSVC)
       # Not all the warnings, but WAll is unusable when using libraries
       # Unless you'd like to support MSVC in the code with pragmas, this is probably the best option
+      # NOTE: explicitly select the "C++ Core Check Lifetime Rules" (or "Microsoft All Rules") in order to enable the lifetime checks.
+      # see https://devblogs.microsoft.com/cppblog/c-core-guidelines-checker-in-visual-studio-2017/
+      # see https://www.modernescpp.com/index.php/c-core-guidelines-lifetime-safety
       list(APPEND WarningFlags
-        "/W4")
+        "/W4"
+        )
     elseif(WGCC)
+      # see https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html
       list(APPEND WarningFlags
-        "-Wall"
-        "-Wextra"
-        "-Wpedantic")
+        -Wall
+        -Wextra
+        -Wpedantic
+        -Wdeprecated-register
+        -Wnon-virtual-dtor
+        # disable warning: designated initializers are a C99 feature
+        -Wno-c99-extensions
+        # see https://kristerw.blogspot.com/2017/09/useful-gcc-warning-options-not-enabled.html
+        -Wduplicated-cond
+        # see https://kristerw.blogspot.com/2017/09/useful-gcc-warning-options-not-enabled.html
+        -Wduplicated-branches
+        # see https://kristerw.blogspot.com/2017/09/useful-gcc-warning-options-not-enabled.html
+        -Wlogical-op
+        # see https://kristerw.blogspot.com/2017/09/useful-gcc-warning-options-not-enabled.html
+        -Wrestrict
+        # see https://kristerw.blogspot.com/2017/09/useful-gcc-warning-options-not-enabled.html
+        -Wnull-dereference
+        # see https://kristerw.blogspot.com/2017/09/useful-gcc-warning-options-not-enabled.html
+        -Wold-style-cast
+        # see https://kristerw.blogspot.com/2017/09/useful-gcc-warning-options-not-enabled.html
+        -Wuseless-cast
+        # see https://kristerw.blogspot.com/2017/09/useful-gcc-warning-options-not-enabled.html
+        -Wjump-misses-init
+        # see https://kristerw.blogspot.com/2017/09/useful-gcc-warning-options-not-enabled.html
+        -Wdouble-promotion
+        # see https://kristerw.blogspot.com/2017/09/useful-gcc-warning-options-not-enabled.html
+        -Wshadow
+        # see https://kristerw.blogspot.com/2017/09/useful-gcc-warning-options-not-enabled.html
+        -Wformat=2)
     elseif(WCLANG)
       list(APPEND WarningFlags
-        "-Wall"
-        "-Weverything"
-        "-Wpedantic")
+        # see https://pspdfkit.com/blog/2020/the-cpp-lifetime-profile/
+        # TODO: only special branch of Clang currently https://github.com/mgehre/llvm-project
+        #-Wlifetime
+        # see http://clang.llvm.org/docs/ThreadSafetyAnalysis.html
+        # see https://github.com/isocpp/CppCoreGuidelines/blob/master/docs/Lifetime.pdf
+        -Wthread-safety
+        -Wall
+        -Weverything
+        -Wpedantic
+        -Wdeprecated-register
+        -Wnon-virtual-dtor
+        # disable warning: designated initializers are a C99 feature
+        -Wno-c99-extensions
+        # see https://kristerw.blogspot.com/2017/09/useful-gcc-warning-options-not-enabled.html
+        -Wduplicated-cond
+        # see https://kristerw.blogspot.com/2017/09/useful-gcc-warning-options-not-enabled.html
+        -Wduplicated-branches
+        # see https://kristerw.blogspot.com/2017/09/useful-gcc-warning-options-not-enabled.html
+        -Wlogical-op
+        # see https://kristerw.blogspot.com/2017/09/useful-gcc-warning-options-not-enabled.html
+        -Wrestrict
+        # see https://kristerw.blogspot.com/2017/09/useful-gcc-warning-options-not-enabled.html
+        -Wnull-dereference
+        # see https://kristerw.blogspot.com/2017/09/useful-gcc-warning-options-not-enabled.html
+        -Wold-style-cast
+        # see https://kristerw.blogspot.com/2017/09/useful-gcc-warning-options-not-enabled.html
+        -Wuseless-cast
+        # see https://kristerw.blogspot.com/2017/09/useful-gcc-warning-options-not-enabled.html
+        -Wjump-misses-init
+        # see https://kristerw.blogspot.com/2017/09/useful-gcc-warning-options-not-enabled.html
+        -Wdouble-promotion
+        # see https://kristerw.blogspot.com/2017/09/useful-gcc-warning-options-not-enabled.html
+        -Wshadow
+        # see https://kristerw.blogspot.com/2017/09/useful-gcc-warning-options-not-enabled.html
+        -Wformat=2
+        )
     endif()
   elseif(NOT ${disable_all} EQUAL -1) # disable all warnings
     # Treat includes as if coming from system to suppress warnings
