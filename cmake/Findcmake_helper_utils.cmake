@@ -927,10 +927,10 @@ function(cppcheck_enabler)
             CPPCHECK_FULL_CMD
               ${CPPCHECK_RUNNABLE}
               # NOTE: generator expression, expands during build time
-              # if the ${ITEM} is non-empty, than append it
+              # if the ${ITEM} is non-empty, then append it
               $<$<BOOL:${collected_defines}>:-D$<JOIN:${collected_defines}, -D>>
               # NOTE: generator expression, expands during build time
-              # if the ${ITEM} is non-empty, than append it
+              # if the ${ITEM} is non-empty, then append it
               $<$<BOOL:${collected_includes}>:-I$<JOIN:${collected_includes}, -I>>
               ${TARGET_SOURCES}
             HTML_REPORT ${CPPCHECK_HTMLREPORT}
@@ -1544,10 +1544,10 @@ function(clang_tidy_enabler)
             CLANG_TIDY_FULL_CMD
               ${CLANG_TIDY_RUNNABLE}
               # NOTE: generator expression, expands during build time
-              # if the ${ITEM} is non-empty, than append it
+              # if the ${ITEM} is non-empty, then append it
               $<$<BOOL:${collected_defines}>:-extra-arg=-D$<JOIN:${collected_defines}, -extra-arg=-D>>
               # NOTE: generator expression, expands during build time
-              # if the ${ITEM} is non-empty, than append it
+              # if the ${ITEM} is non-empty, then append it
               # To suppress compiler diagnostic messages
               # from third-party headers just use -isystem
               # instead of -I to include those headers.
@@ -1858,10 +1858,10 @@ function(cppclean_enabler)
             CPPCLEAN_FULL_CMD
               ${CPPCLEAN_RUNNABLE}
               # NOTE: generator expression, expands during build time
-              # if the ${ITEM} is non-empty, than append it
+              # if the ${ITEM} is non-empty, then append it
               #$<$<BOOL:${collected_defines}>:-D$<JOIN:${collected_defines}, -D>>
               # NOTE: generator expression, expands during build time
-              # if the ${ITEM} is non-empty, than append it
+              # if the ${ITEM} is non-empty, then append it
               # To suppress compiler diagnostic messages
               # from third-party headers just use -isystem
               # instead of -I to include those headers.
@@ -2198,10 +2198,10 @@ function(oclint_enabler)
             OCLINT_FULL_CMD
               ${OCLINT_RUNNABLE}
               # NOTE: generator expression, expands during build time
-              # if the ${ITEM} is non-empty, than append it
+              # if the ${ITEM} is non-empty, then append it
               $<$<BOOL:${collected_defines}>:-extra-arg=-D$<JOIN:${collected_defines}, -extra-arg=-D>>
               # NOTE: generator expression, expands during build time
-              # if the ${ITEM} is non-empty, than append it
+              # if the ${ITEM} is non-empty, then append it
               # To suppress compiler diagnostic messages
               # from third-party headers just use -isystem
               # instead of -I to include those headers.
@@ -2246,6 +2246,7 @@ function(add_iwyu_target)
   )
   set(oneValueArgs
     TARGET_NAME
+    POSTFIX
   )
   set(multiValueArgs
     IWYU_FULL_CMD
@@ -2280,46 +2281,53 @@ function(add_iwyu_target)
   set(IWYU_FULL_CMD
     ${ARGUMENTS_IWYU_FULL_CMD}
     ${ARGUMENTS_EXTRA_OPTIONS}
+    # NOTE: `|| true` will allow IWYU
+    # to scan all source files even if one of them failed with error
+    # see https://stackoverflow.com/a/50027621
+    # Note: iwyu outputs to stderr and always returns a failure status code
+    # since it generates no output.
+    # see https://github.com/include-what-you-use/include-what-you-use/issues/440
+    ";||;true"
   )
   #
   # USAGE:
-  # cmake -E time cmake --build . --target TARGET_NAME_run_iwyu
+  # cmake -E time cmake --build . --target TARGET_NAME_run_iwyu_${ARGUMENTS_POSTFIX}
   if(ARGUMENTS_VERBOSE)
-    message(STATUS "added new target: ${ARGUMENTS_TARGET_NAME}_run_iwyu")
+    message(STATUS "added new target: ${ARGUMENTS_TARGET_NAME}_run_iwyu_${ARGUMENTS_POSTFIX}")
   endif(ARGUMENTS_VERBOSE)
-  add_custom_target(${ARGUMENTS_TARGET_NAME}_run_iwyu
+  add_custom_target(${ARGUMENTS_TARGET_NAME}_run_iwyu_${ARGUMENTS_POSTFIX}
     # remove old report
-    COMMAND
-      # Remove the file(s).
-      # If any of the listed files already do not exist,
-      # the command returns a non-zero exit code,
-      # but no message is logged.
-      # The -f option changes the behavior to return a zero exit code
-      # (i.e. success) in such situations instead.
-      ${CMAKE_COMMAND}
-      -E
-      remove
-      -f
-      ${CMAKE_BINARY_DIR}/${ARGUMENTS_TARGET_NAME}_iwyu_report.xml
-    # create report dir
-    COMMAND
-      ${CMAKE_COMMAND}
-      -E
-      make_directory
-      ${CMAKE_BINARY_DIR}/${ARGUMENTS_TARGET_NAME}_report
+    #COMMAND
+    #  # Remove the file(s).
+    #  # If any of the listed files already do not exist,
+    #  # the command returns a non-zero exit code,
+    #  # but no message is logged.
+    #  # The -f option changes the behavior to return a zero exit code
+    #  # (i.e. success) in such situations instead.
+    #  ${CMAKE_COMMAND}
+    #  -E
+    #  remove
+    #  -f
+    #  ${CMAKE_BINARY_DIR}/${ARGUMENTS_TARGET_NAME}_iwyu_report.xml
+    ## create report dir
+    #COMMAND
+    #  ${CMAKE_COMMAND}
+    #  -E
+    #  make_directory
+    #  ${CMAKE_BINARY_DIR}/${ARGUMENTS_TARGET_NAME}_report
     # remove old report
-    COMMAND
-      # Remove the file(s).
-      # If any of the listed files already do not exist,
-      # the command returns a non-zero exit code,
-      # but no message is logged.
-      # The -f option changes the behavior to return a zero exit code
-      # (i.e. success) in such situations instead.
-      ${CMAKE_COMMAND}
-      -E
-      remove
-      -f
-      ${CMAKE_BINARY_DIR}/${ARGUMENTS_TARGET_NAME}_report/index.html
+    #COMMAND
+    #  # Remove the file(s).
+    #  # If any of the listed files already do not exist,
+    #  # the command returns a non-zero exit code,
+    #  # but no message is logged.
+    #  # The -f option changes the behavior to return a zero exit code
+    #  # (i.e. success) in such situations instead.
+    #  ${CMAKE_COMMAND}
+    #  -E
+    #  remove
+    #  -f
+    #  ${CMAKE_BINARY_DIR}/${ARGUMENTS_TARGET_NAME}_report/index.html
     # print command that will be executed
     # NOTE: uses COMMAND_EXPAND_LISTS
     # to support generator expressions
@@ -2347,7 +2355,7 @@ function(add_iwyu_target)
 endfunction(add_iwyu_target)
 
 # USAGE:
-# cmake -E time cmake --build . --target TARGET_NAME_run_iwyu
+# cmake -E time cmake --build . --target TARGET_NAME_run_iwyu_${ARGUMENTS_POSTFIX}
 # EXAMPLE:
 # iwyu_enabler(
 #   PATHS
@@ -2485,53 +2493,76 @@ function(iwyu_enabler)
           if(ARGUMENTS_VERBOSE)
             message(STATUS "enabled iwyu for target ${TARGET_NAME}")
           endif(ARGUMENTS_VERBOSE)
-          #
-          #get_all_compile_definitions(collected_defines
-          #  ${TARGET_NAME}
-          #)
-          ##
-          #get_all_include_directories(collected_includes
-          #  ${TARGET_NAME}
-          #)
-          ##
-          #get_target_sources(TARGET_SOURCES
-          #  ${TARGET_NAME}
-          #)
-          #
-          #add_iwyu_target(
-          #  TARGET_NAME ${TARGET_NAME}
-          #  IWYU_FULL_CMD
-          #    ${IWYU_RUNNABLE}
-          #    # NOTE: generator expression, expands during build time
-          #    # if the ${ITEM} is non-empty, than append it
-          #    $<$<BOOL:${collected_defines}>:-D$<JOIN:${collected_defines}, -D>>
-          #    # NOTE: generator expression, expands during build time
-          #    # if the ${ITEM} is non-empty, than append it
-          #    # To suppress compiler diagnostic messages
-          #    # from third-party headers just use -isystem
-          #    # instead of -I to include those headers.
-          #    # $<$<BOOL:${collected_includes}>:-extra-arg=-isystem$<JOIN:${collected_includes}, -extra-arg=-isystem>>
-          #    $<$<BOOL:${collected_includes}>:-I$<JOIN:${collected_includes}, -I>>
-          #    #$<$<BOOL:${TARGET_SOURCES}>:--check_also=$<JOIN:${TARGET_SOURCES}, --check_also=>>
-          #    ${TARGET_SOURCES}
-          #  EXTRA_OPTIONS ${IWYU_OPTIONS}
-          #)
-          #if(CHECK_TARGETS_DEPEND)
-          #  # run iwyu on each build of target
-          #  add_dependencies(
-          #    ${TARGET_NAME}
-          #    ${TARGET_NAME}_run_iwyu
-          #  )
-          #endif(CHECK_TARGETS_DEPEND)
 
-          #separate_arguments(IWYU_OPTIONS)
-
-          set_property(TARGET ${TARGET_NAME}
-            PROPERTY
-              CXX_INCLUDE_WHAT_YOU_USE
-                ${IWYU_RUNNABLE} ${IWYU_OPTIONS}
+          get_all_compile_definitions(collected_defines
+            ${TARGET_NAME}
           )
-        endforeach()
+
+          get_all_include_directories(collected_includes
+            ${TARGET_NAME}
+          )
+
+          get_target_sources(TARGET_SOURCES
+            ${TARGET_NAME}
+          )
+
+          add_custom_target(${TARGET_NAME}_run_iwyu)
+
+          # loop index
+          set(_loop_counter "0")
+          # loop over source files
+          foreach(FILE_NAME ${TARGET_SOURCES})
+            # increment variable (loop index)
+            MATH(EXPR _loop_counter "${_loop_counter}+1")
+
+            add_iwyu_target(
+              TARGET_NAME ${TARGET_NAME}
+              POSTFIX ${_loop_counter}
+              IWYU_FULL_CMD
+                ${IWYU_RUNNABLE}
+                ${IWYU_OPTIONS}
+                # NOTE: generator expression, expands during build time
+                # if the ${ITEM} is non-empty, then append it
+                $<$<BOOL:${collected_defines}>:-D$<JOIN:${collected_defines}, -D>>
+                # NOTE: generator expression, expands during build time
+                # if the ${ITEM} is non-empty, then append it
+                # To suppress compiler diagnostic messages
+                # from third-party headers just use -isystem
+                # instead of -I to include those headers.
+                # $<$<BOOL:${collected_includes}>:-extra-arg=-isystem$<JOIN:${collected_includes}, -extra-arg=-isystem>>
+                $<$<BOOL:${collected_includes}>:-I$<JOIN:${collected_includes}, -I>>
+                #$<$<BOOL:${TARGET_SOURCES}>:--check_also=$<JOIN:${TARGET_SOURCES}, --check_also=>>
+                # pass each file individually to fix
+                # `error: unable to handle compilation, expected exactly one compiler job`
+                ${FILE_NAME}
+              EXTRA_OPTIONS ${IWYU_OPTIONS}
+            )
+
+            # run iwyu on each build of target
+            add_dependencies(
+              ${TARGET_NAME}_run_iwyu
+              ${TARGET_NAME}_run_iwyu_${_loop_counter}
+            )
+          endforeach() # TARGET_SOURCES
+
+          if(CHECK_TARGETS_DEPEND)
+            # run iwyu on each build of target
+            add_dependencies(
+              ${TARGET_NAME}
+              ${TARGET_NAME}_run_iwyu
+            )
+          endif(CHECK_TARGETS_DEPEND)
+
+          separate_arguments(IWYU_OPTIONS)
+
+          # NOTE: CXX_INCLUDE_WHAT_YOU_USE broken
+          # see https://gitlab.kitware.com/cmake/cmake/-/issues/19706
+          #set_property(TARGET ${TARGET_NAME}
+          #  PROPERTY
+          #    CXX_INCLUDE_WHAT_YOU_USE
+          #      ${IWYU_RUNNABLE} ${IWYU_OPTIONS}
+          #)
+        endforeach() # ARGUMENTS_CHECK_TARGETS
       else(ARGUMENTS_CHECK_TARGETS)
         if(ARGUMENTS_VERBOSE)
           message(STATUS "iwyu: no CHECK_TARGETS provided")
@@ -2825,10 +2856,10 @@ function(clang_format_enabler)
             CLANG_FORMAT_FULL_CMD
               ${CLANG_FORMAT_RUNNABLE}
               # NOTE: generator expression, expands during build time
-              # if the ${ITEM} is non-empty, than append it
+              # if the ${ITEM} is non-empty, then append it
               #$<$<BOOL:${collected_defines}>:-extra-arg=-D$<JOIN:${collected_defines}, -extra-arg=-D>>
               # NOTE: generator expression, expands during build time
-              # if the ${ITEM} is non-empty, than append it
+              # if the ${ITEM} is non-empty, then append it
               # To suppress compiler diagnostic messages
               # from third-party headers just use -isystem
               # instead of -I to include those headers.
@@ -3137,10 +3168,10 @@ function(uncrustify_enabler)
             UNCRUSTIFY_FULL_CMD
               ${UNCRUSTIFY_RUNNABLE}
               # NOTE: generator expression, expands during build time
-              # if the ${ITEM} is non-empty, than append it
+              # if the ${ITEM} is non-empty, then append it
               #$<$<BOOL:${collected_defines}>:-extra-arg=-D$<JOIN:${collected_defines}, -extra-arg=-D>>
               # NOTE: generator expression, expands during build time
-              # if the ${ITEM} is non-empty, than append it
+              # if the ${ITEM} is non-empty, then append it
               # To suppress compiler diagnostic messages
               # from third-party headers just use -isystem
               # instead of -I to include those headers.
@@ -3576,7 +3607,7 @@ endfunction()
 # see https://cristianadam.eu/20170709/speeding-up-cmake/
 # TODO: use with gold: "--threads", "--thread-count COUNT", "--preread-archive-symbols"
 # NOTE: gold not threaded by default, configure with "--enable-threads"
-# NOTE: lld threaded by default, may be faster than gold
+# NOTE: lld threaded by default, may be faster then gold
 macro(add_gold_linker)
   if("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU")
     execute_process(
@@ -3912,7 +3943,7 @@ endfunction(target_set_warnings)
 # Note : For CMake versions < 3.9, target_link_library is used in it's non plain version.
 #        You will need to specify PUBLIC/PRIVATE/INTERFACE to all your other target_link_library calls for the target
 #
-# WARNING for cmake versions older than 3.9 :
+# WARNING for cmake versions older then 3.9 :
 # This module will override CMAKE_AR CMAKE_RANLIB and CMAKE_NM by the gcc versions if found when building with gcc
 #
 
@@ -4048,7 +4079,7 @@ macro(find_lto lang)
     endif(${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} VERSION_LESS 3.9)
   endif(NOT LTO_${lang}_CHECKED)
 
-  #Special case for cmake older than 3.9, using a library for gcc/clang, but could setup the flags directly.
+  #Special case for cmake older then 3.9, using a library for gcc/clang, but could setup the flags directly.
   #Taking advantage of the [debug,optimized] parameter of target_link_libraries
   if(${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} VERSION_LESS 3.9)
     if(LTO_${lang}_SUPPORT)
