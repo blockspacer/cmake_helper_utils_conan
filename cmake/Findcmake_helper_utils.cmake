@@ -2530,7 +2530,7 @@ function(iwyu_enabler)
                 # from third-party headers just use -isystem
                 # instead of -I to include those headers.
                 # $<$<BOOL:${collected_includes}>:-extra-arg=-isystem$<JOIN:${collected_includes}, -extra-arg=-isystem>>
-                $<$<BOOL:${collected_includes}>:-I$<JOIN:${collected_includes}, -I>>
+                $<$<BOOL:${collected_includes}>:-isystem$<JOIN:${collected_includes}, -isystem>>
                 #$<$<BOOL:${TARGET_SOURCES}>:--check_also=$<JOIN:${TARGET_SOURCES}, --check_also=>>
                 # pass each file individually to fix
                 # `error: unable to handle compilation, expected exactly one compiler job`
