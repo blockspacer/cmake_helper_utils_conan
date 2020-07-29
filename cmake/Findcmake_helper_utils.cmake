@@ -3221,10 +3221,12 @@ macro(compile_with_llvm_tools)
     VERBOSE TRUE
   )
 
-  set(CMAKE_C_COMPILER
-    ${CLANG_PROGRAM}
-    CACHE string
-    "Clang C compiler" FORCE)
+  # we can NOT change CMAKE_C_COMPILER dynamically
+  # (it will corrupt cmake cache), but we can check CC env. var
+  if(NOT "${CMAKE_C_COMPILER}" STREQUAL "${CLANG_PROGRAM}")
+    message(WARNING "CMAKE_C_COMPILER=${CMAKE_C_COMPILER} does not match ${CLANG_PROGRAM}. Run command:")
+    message(FATAL_ERROR "export CC=${CLANG_PROGRAM}")
+  endif()
 
   # use llvm_tools from conan
   find_program_helper(clang++
@@ -3239,10 +3241,16 @@ macro(compile_with_llvm_tools)
     VERBOSE TRUE
   )
 
-  set(CMAKE_CXX_COMPILER
-    ${CLANGPP_PROGRAM}
-    CACHE string
-    "Clang C++ compiler" FORCE)
+  # we can NOT change CMAKE_CXX_COMPILER dynamically
+  # (it will corrupt cmake cache), but we can check CXX env. var
+  if(NOT "${CMAKE_CXX_COMPILER}" STREQUAL "${CLANGPP_PROGRAM}")
+    message(WARNING "CMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} does not match ${CLANGPP_PROGRAM}. Run command:")
+    message(FATAL_ERROR "export CXX=${CLANGPP_PROGRAM}")
+  endif()
+
+  if(NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+    message(FATAL_ERROR "CMAKE_CXX_COMPILER_ID=${CMAKE_CXX_COMPILER_ID} does not match Clang. Run command:")
+  endif()
 
   # use llvm_tools from conan
   find_program_helper(llvm-ar
@@ -3352,30 +3360,6 @@ macro(compile_with_llvm_tools)
   set(CMAKE_ASM_COMPILER  "${LLVM_ASM_PROGRAM}")
   set(CMAKE_RC_COMPILER  "${LLVM_RC_PROGRAM}")
 
-  #  -lc++abi -Wno-unused-command-line-argument
-  set(CMAKE_C_FLAGS
-    "${CMAKE_C_FLAGS} \
-    -stdlib=libc++")
-
-  set(CMAKE_CXX_FLAGS
-    "${CMAKE_CXX_FLAGS} \
-    -stdlib=libc++")
-
-  link_libraries("-stdlib=libc++ -lc++abi -lc++ -lm -lc")
-
-  # Set compiler flags
-  #set(CMAKE_STATIC_LINKER_FLAGS
-  #  "${CMAKE_STATIC_LINKER_FLAGS} \
-  #  -lc++abi -lc++ -lm -lc")
-  ##
-  #set(CMAKE_SHARED_LINKER_FLAGS
-  #  "${CMAKE_SHARED_LINKER_FLAGS} \
-  #  -lc++abi -lc++ -lm -lc")
-
-  set(CMAKE_EXE_LINKER_FLAGS
-    "${CMAKE_EXE_LINKER_FLAGS} \
-    -stdlib=libc++ -lc++abi -lc++ -lm -lc")
-
   # use llvm_tools from conan
   find_library(CLANG_LIBCPP
     NAMES
@@ -3399,33 +3383,6 @@ macro(compile_with_llvm_tools)
     message(FATAL_ERROR
       "Path to libc++ must be absolute")
   endif(NOT IS_ABSOLUTE ${CLANG_LIBCPP_DIR})
-  #
-  # Set compiler flags
-  # FIXME: argument unused during compilation
-  #set(CMAKE_CXX_FLAGS
-  #  "${CMAKE_CXX_FLAGS} \
-  #  -L${CLANG_LIBCPP_DIR}")
-  # FIXME: 'linker' input unused CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG
-  ##
-  #set(CMAKE_LD_FLAGS
-  #  "${CMAKE_LD_FLAGS} \
-  #  -Wl,-rpath,${CONAN_LLVM_TOOLS_ROOT}/lib \
-  #  -Wl,-rpath,${CLANG_LIBCPP_DIR}")
-  #
-  #set(CMAKE_STATIC_LINKER_FLAGS
-  #  "${CMAKE_STATIC_LINKER_FLAGS} \
-  #  -Wl,-rpath,${CONAN_LLVM_TOOLS_ROOT}/lib \
-  #  -Wl,-rpath,${CLANG_LIBCPP_DIR}")
-  ###
-  #set(CMAKE_SHARED_LINKER_FLAGS
-  #  "${CMAKE_SHARED_LINKER_FLAGS} \
-  #  -Wl,-rpath,${CONAN_LLVM_TOOLS_ROOT}/lib \
-  #  -Wl,-rpath,${CLANG_LIBCPP_DIR}")
-  ###
-  #set(CMAKE_EXE_LINKER_FLAGS
-  #  "${CMAKE_EXE_LINKER_FLAGS} \
-  #  -Wl,-rpath,${CONAN_LLVM_TOOLS_ROOT}/lib \
-  #  -Wl,-rpath,${CLANG_LIBCPP_DIR}")
 
   # use llvm_tools from conan
   find_library(CLANG_LIBCPPABI
@@ -3450,17 +3407,7 @@ macro(compile_with_llvm_tools)
     message(FATAL_ERROR
       "Path to libc++abi must be absolute")
   endif(NOT IS_ABSOLUTE ${CLANG_LIBCPPABI_DIR})
-  #
-  # FIXME: 'linker' input unused
-  # Set compiler flags
-  #set(CMAKE_CXX_FLAGS
-  #  "${CMAKE_CXX_FLAGS} \
-  #  -L${CLANG_LIBCPPABI_DIR} \
-  #  -Wl,-rpath,${CONAN_LLVM_TOOLS_ROOT}/lib \
-  #  -Wl,-rpath,${CLANG_LIBCPPABI_DIR}")
 
-  # -isystem /path/to/libcxx_msan/include
-  # -isystem /path/to/libcxx_msan/include/c++/v1
   find_path(
     LIBCXX_LIBCXXABI_INCLUDE_FILE cxxabi.h
     PATHS
@@ -3486,61 +3433,68 @@ macro(compile_with_llvm_tools)
     message(FATAL_ERROR
       "CONAN_LLVM_TOOLS_ROOT not found")
   endif()
-  # Set compiler flags
-  # FIXME: gtest.h:57
-  # error: no member named 'abort' in namespace 'std'
-  # -isystem ${CONAN_LLVM_TOOLS_ROOT}/include/c++/v1
-  #set(CMAKE_CXX_FLAGS
-  #  "${CMAKE_CXX_FLAGS} \
-  #  -isystem ${LIBCXX_LIBCXXABI_INCLUDE_FILE_DIR} \
-  #  -isystem ${CONAN_LLVM_TOOLS_ROOT}/include")
 
-  include_directories(
-    "${CONAN_LLVM_TOOLS_ROOT}/include"
-    "${CONAN_LLVM_TOOLS_ROOT}/include/c++/v1")
+  # libcxx which we will use with specific version of clang
+  SET(LIBCXX_INC_PATH
+    ${CONAN_LLVM_TOOLS_ROOT}/include/c++/v1)
 
-  #set(CMAKE_C_FLAGS
-  #  "${CMAKE_C_FLAGS} \
-  #  -I${CONAN_LLVM_TOOLS_ROOT}/include/c++/v1 \
-  #  -I${CONAN_LLVM_TOOLS_ROOT}/include")
+  SET(LIBCXX_LIB_PATH
+    ${CONAN_LLVM_TOOLS_ROOT}/lib)
 
-  set(CMAKE_CXX_FLAGS
-    "${CMAKE_CXX_FLAGS} \
-    -I${CONAN_LLVM_TOOLS_ROOT}/include/c++/v1 \
-    -I${CONAN_LLVM_TOOLS_ROOT}/include")
+  # Remove -stdlib flags
+  string(REPLACE "-stdlib=libstdc++" ""
+    CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+  string(REPLACE "-static-libstdc++" ""
+    CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+  string(REPLACE "-stdlib=libstdc++" ""
+    CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
+  string(REPLACE "-static-libstdc++" ""
+    CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
 
-  link_directories("${CONAN_LLVM_TOOLS_ROOT}/lib")
-  link_directories("${CLANG_LIBCPP_DIR}")
-
-  #set(CMAKE_C_FLAGS
-  #  "${CMAKE_C_FLAGS} \
-  #  -L${CONAN_LLVM_TOOLS_ROOT}/lib \
-  #  -L${CLANG_LIBCPP_DIR}")
-
-  # see https://github.com/GMLC-TDC/helics-buildenv/blob/7b9de98d18960fd9959e102935c694597b85b1af/sanitizers/Dockerfile#L61
-  #-l~/.conan/data/llvm_tools/master/conan/stable/package/#0317bac93bec74216c947d1359dc7160e8dce7c1/lib/libc++.a \
-  #-l~/.conan/data/llvm_tools/master/conan/stable/package/#0317bac93bec74216c947d1359dc7160e8dce7c1/lib/libc++abi.a
-  # TODO: remove -std=c++17
-  set(CMAKE_CXX_FLAGS
-    "${CMAKE_CXX_FLAGS} \
+  set(CMAKE_CXX_FLAGS "\
+    -D__CLANG__ \
+    -nostdinc++ \
     -Wno-unused-command-line-argument \
-    -L${CONAN_LLVM_TOOLS_ROOT}/lib \
-    -L${CLANG_LIBCPP_DIR} \
-    -Wl,-rpath,${CLANG_LIBCPPABI_DIR} \
-    -Wl,-rpath,${CONAN_LLVM_TOOLS_ROOT}/lib \
-    -stdlib=libc++ -lc++abi -lc++ -lm -lc -fuse-ld=lld")
+    -Wno-error=unused-command-line-argument \
+    -stdlib=libc++ \
+    -isystem ${LIBCXX_INC_PATH} \
+    -isystem ${CONAN_LLVM_TOOLS_ROOT}/include \
+    -isystem ${CONAN_LLVM_TOOLS_ROOT}/lib/clang/10.0.1/include \
+    ${CMAKE_CXX_FLAGS}")
 
-  # -nostdinc++ makes '-stdlib=libc++' unused.
-  add_compile_options(
-      "-stdlib=libc++"
-      "-lc++abi"
-      "-nostdinc++"
-      "-nodefaultlibs"
-      "-v")
+  set(CMAKE_EXE_LINKER_FLAGS "\
+    -lc++ -lc++abi -lunwind \
+    -Wl,-rpath,${LIBCXX_LIB_PATH} \
+    -stdlib=libc++ \
+    ${CMAKE_EXE_LINKER_FLAGS}")
 
-  #add_definitions(-std=c++17) # TODO: remove -std=c++17
+  set(CMAKE_SHARED_LINKER_FLAGS "\
+    -lc++ -lc++abi -lunwind \
+    -Wl,-rpath,${LIBCXX_LIB_PATH} \
+    -stdlib=libc++ \
+    ${CMAKE_SHARED_LINKER_FLAGS}")
 
-  #MSAN_CFLAGS="-fsanitize=memory -stdlib=libc++ -L/root/develop/libcxx_msan/lib -lc++abi -I/root/develop/libcxx_msan/include -I/root/develop/libcxx_msan/include/c++/v1 -Wno-unused-command-line-argument -fno-omit-frame-pointer -g -O1 -Wl,-rpath=/root/develop/libcxx_msan/lib"
+  link_directories(${LIBCXX_LIB_PATH})
+
+  include(CheckCXXSourceCompiles)
+
+  # Check if initializer lists are supported.
+  check_cxx_source_compiles("
+#include <iostream>
+#ifdef __GLIBCXX__
+  #error \"Using libstdc++\"
+#else
+  #warning \"Using libc++\"
+#endif
+int main(int argc, char* argv[])
+{
+return 0;
+}
+" SUPPORTS_LIBCPP)
+  if (NOT SUPPORTS_LIBCPP)
+    message(FATAL_ERROR "Unable to compile test program using libc++")
+  endif ()
+
 endmacro(compile_with_llvm_tools)
 
 ################################################################################
@@ -3865,7 +3819,8 @@ function(target_set_warnings)
         if ("${CMAKE_CXX_SIMULATE_ID}" STREQUAL "MSVC")
           # clang-cl has some VCC flags by default that it will not recognize...
           list(APPEND WarningFlags
-            -Wno-unused-command-line-argument)
+            -Wno-unused-command-line-argument
+            -Wno-error=unused-command-line-argument)
         endif()
       endif(WCLANG)
     endif()
