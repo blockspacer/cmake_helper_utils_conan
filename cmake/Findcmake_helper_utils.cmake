@@ -3451,6 +3451,9 @@ macro(compile_with_llvm_tools)
   string(REPLACE "-static-libstdc++" ""
     CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
 
+  set(CMAKE_REQUIRED_FLAGS
+    "${CMAKE_REQUIRED_FLAGS} -stdlib=libc++")
+
   set(CMAKE_CXX_FLAGS "\
     -D__CLANG__ \
     -nostdinc++ \
