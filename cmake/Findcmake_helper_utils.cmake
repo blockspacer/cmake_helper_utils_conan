@@ -3346,19 +3346,40 @@ macro(compile_with_llvm_tools)
   )
 
   # Set linkers and other build tools.
+  # NOTE: use UNINSTRUMENTED llvm-ar, llvml-symbolizer, etc.
   # Related documentation
   # https://cmake.org/cmake/help/latest/variable/CMAKE_LANG_COMPILER.html
   # https://cmake.org/cmake/help/latest/variable/CMAKE_LANG_FLAGS_INIT.html
   # https://cmake.org/cmake/help/latest/variable/CMAKE_LINKER.html
   # https://cmake.org/cmake/help/latest/variable/CMAKE_AR.html
   # https://cmake.org/cmake/help/latest/variable/CMAKE_RANLIB.html
-  set(CMAKE_AR      "${LLVM_AR_PROGRAM}")
-  set(CMAKE_LINKER  "${LLVM_LD_PROGRAM}")
-  set(CMAKE_NM      "${LLVM_NM_PROGRAM}")
-  set(CMAKE_OBJDUMP "${LLVM_OBJDUMP_PROGRAM}")
-  set(CMAKE_RANLIB  "${LLVM_RANLIB_PROGRAM}")
-  set(CMAKE_ASM_COMPILER  "${LLVM_ASM_PROGRAM}")
-  set(CMAKE_RC_COMPILER  "${LLVM_RC_PROGRAM}")
+  if(NOT CMAKE_AR)
+    set(CMAKE_AR "${LLVM_AR_PROGRAM}")
+  endif(NOT CMAKE_AR)
+  #
+  if(NOT CMAKE_LINKER)
+    set(CMAKE_LINKER "${LLVM_LD_PROGRAM}")
+  endif(NOT CMAKE_LINKER)
+  #
+  if(NOT CMAKE_NM)
+    set(CMAKE_NM "${LLVM_NM_PROGRAM}")
+  endif(NOT CMAKE_NM)
+  #
+  if(NOT CMAKE_OBJDUMP)
+    set(CMAKE_OBJDUMP "${LLVM_OBJDUMP_PROGRAM}")
+  endif(NOT CMAKE_OBJDUMP)
+  #
+  if(NOT CMAKE_RANLIB)
+    set(CMAKE_RANLIB "${LLVM_RANLIB_PROGRAM}")
+  endif(NOT CMAKE_RANLIB)
+  #
+  if(NOT CMAKE_ASM_COMPILER)
+    set(CMAKE_ASM_COMPILER "${LLVM_ASM_PROGRAM}")
+  endif(NOT CMAKE_ASM_COMPILER)
+  #
+  if(NOT CMAKE_RC_COMPILER)
+    set(CMAKE_RC_COMPILER "${LLVM_RC_PROGRAM}")
+  endif(NOT CMAKE_RC_COMPILER)
 
   # use llvm_tools from conan
   find_library(CLANG_LIBCPP
