@@ -3764,7 +3764,7 @@ function(target_set_warnings)
         #-Wlifetime
         # see http://clang.llvm.org/docs/ThreadSafetyAnalysis.html
         # see https://github.com/isocpp/CppCoreGuidelines/blob/master/docs/Lifetime.pdf
-        -Wthread-safety
+        -Wthread-safety-analysis
         -Wall
         -Weverything
         -Wpedantic
@@ -3794,6 +3794,9 @@ function(target_set_warnings)
         -Wshadow
         # see https://kristerw.blogspot.com/2017/09/useful-gcc-warning-options-not-enabled.html
         -Wformat=2
+        # Negative requirements are an experimental feature
+        # which will produce many warnings in existing code
+        -Wno-thread-safety-negative
         )
     endif()
   elseif(NOT ${disable_all} EQUAL -1) # disable all warnings
