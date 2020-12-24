@@ -14,4 +14,7 @@ GIT_SSL_NO_VERIFY=true \
       conan create . conan/stable \
       -s build_type=Debug \
       --profile clang
+
+# clean build cache
+conan remove "*" --build --force
 ```

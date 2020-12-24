@@ -4437,3 +4437,82 @@ macro(addinstallManifest)
       ${CMAKE_COMMAND}
       -P ${CMAKE_CURRENT_BINARY_DIR}/Uninstall.cmake)
 endmacro()
+
+# `configure_file_if_changed` able to detect configuration changes
+# (changes in used cmake defines) or missing files
+# i.e. it will not re-generate files if configuration not changed.
+#
+# MOTIVATION: `configure_file` will NOT re-generate file if used cmake defines
+# changed. It able to detect changes only in input file before preprocessing.
+# Use `configure_file_if_changed` as drop-in replacement for `configure_file`.
+#
+# It uses configure_file(... @ONLY), so make sure you declared
+# all required CMake defines i.e. `@USE_ALLOCATOR_SHIM_FLAG@` in input file
+# will expand to 1 in output file only if you declared in CMake
+# `set(USE_ALLOCATOR_SHIM_FLAG "1")`.
+#
+# Function
+#   configure_file_if_changed(INPUT <...> OUTPUT <...> TMP_FILE <...>)
+#
+function(configure_file_if_changed)
+  # see https://cliutils.gitlab.io/modern-cmake/chapters/basics/functions.html
+  #set(options ) # empty
+  set(oneValueArgs INPUT OUTPUT TMP_FILE )
+  set(multiValueArgs ) # empty
+  #
+  cmake_parse_arguments(
+    ARGUMENTS # prefix of output variables
+    "${options}" # list of names of the boolean arguments (only defined ones will be true)
+    "${oneValueArgs}" # list of names of mono-valued arguments
+    "${multiValueArgs}" # list of names of multi-valued arguments (output variables are lists)
+    ${ARGN} # arguments of the function to parse, here we take the all original ones
+  )
+  #
+  set(INPUT ${ARGUMENTS_INPUT})
+  #
+  set(OUTPUT ${ARGUMENTS_OUTPUT})
+  #
+  set(TMP_FILE ${ARGUMENTS_TMP_FILE})
+  #
+  set(UNPARSED_ARGUMENTS ${ARGUMENTS_UNPARSED_ARGUMENTS})
+  #
+  set(BUILDFLAG_NEED_UPDATING FALSE)
+  if(NOT EXISTS "${OUTPUT}")
+    message(STATUS "Unable to find required file: ${OUTPUT}")
+    message(STATUS "File will be re-generated: ${OUTPUT}")
+    set(BUILDFLAG_NEED_UPDATING TRUE)
+  else()
+    configure_file(${INPUT}
+      ${TMP_FILE} @ONLY)
+    # compare with the real file
+    execute_process(
+      COMMAND
+        ${CMAKE_COMMAND} -E compare_files
+          ${TMP_FILE}
+          ${OUTPUT}
+      RESULT_VARIABLE
+        BUILDFLAG_NEED_UPDATING
+      OUTPUT_QUIET
+      ERROR_QUIET
+    )
+  endif()
+
+  # update the real version if necessary
+  if(BUILDFLAG_NEED_UPDATING)
+    # remove old file
+    execute_process(
+      COMMAND
+        ${CMAKE_COMMAND} -E remove
+          ${OUTPUT}
+      OUTPUT_QUIET
+      ERROR_QUIET
+    )
+
+    # generate new file
+    configure_file(${INPUT}
+      ${OUTPUT} @ONLY)
+  endif(BUILDFLAG_NEED_UPDATING)
+
+  set_source_files_properties(${OUTPUT}
+    PROPERTIES GENERATED TRUE)
+endfunction()
