@@ -4476,29 +4476,39 @@ function(configure_file_if_changed)
   #
   set(UNPARSED_ARGUMENTS ${ARGUMENTS_UNPARSED_ARGUMENTS})
   #
-  set(BUILDFLAG_NEED_UPDATING FALSE)
+  set(INTERNAL_NEED_TO_UPDATE_FILE FALSE)
   if(NOT EXISTS "${OUTPUT}")
     message(STATUS "Unable to find required file: ${OUTPUT}")
     message(STATUS "File will be re-generated: ${OUTPUT}")
-    set(BUILDFLAG_NEED_UPDATING TRUE)
+    set(INTERNAL_NEED_TO_UPDATE_FILE TRUE)
   else()
+    # remove old tmp file
+    execute_process(
+      COMMAND
+        ${CMAKE_COMMAND} -E remove
+          ${TMP_FILE}
+      OUTPUT_QUIET
+      ERROR_QUIET
+    )
+
     configure_file(${INPUT}
       ${TMP_FILE} @ONLY)
-    # compare with the real file
+
+    # compare tmp file with the real file
     execute_process(
       COMMAND
         ${CMAKE_COMMAND} -E compare_files
           ${TMP_FILE}
           ${OUTPUT}
       RESULT_VARIABLE
-        BUILDFLAG_NEED_UPDATING
+        INTERNAL_NEED_TO_UPDATE_FILE
       OUTPUT_QUIET
       ERROR_QUIET
     )
   endif()
 
-  # update the real version if necessary
-  if(BUILDFLAG_NEED_UPDATING)
+  # update the real file if necessary
+  if(INTERNAL_NEED_TO_UPDATE_FILE)
     # remove old file
     execute_process(
       COMMAND
@@ -4511,7 +4521,12 @@ function(configure_file_if_changed)
     # generate new file
     configure_file(${INPUT}
       ${OUTPUT} @ONLY)
-  endif(BUILDFLAG_NEED_UPDATING)
+  endif(INTERNAL_NEED_TO_UPDATE_FILE)
+
+  # file generation may fail due to OS or drive issues (not enough disk space, etc.)
+  if(NOT EXISTS "${OUTPUT}")
+    message(WARNING "Something went wrong. Unable to find generated file: ${OUTPUT}")
+  endif()
 
   set_source_files_properties(${OUTPUT}
     PROPERTIES GENERATED TRUE)
