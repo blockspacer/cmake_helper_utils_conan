@@ -4488,7 +4488,6 @@ function(configure_file_if_changed)
         ${CMAKE_COMMAND} -E remove
           ${TMP_FILE}
       OUTPUT_QUIET
-      ERROR_QUIET
     )
 
     configure_file(${INPUT}
@@ -4503,7 +4502,6 @@ function(configure_file_if_changed)
       RESULT_VARIABLE
         INTERNAL_NEED_TO_UPDATE_FILE
       OUTPUT_QUIET
-      ERROR_QUIET
     )
   endif()
 
@@ -4515,12 +4513,17 @@ function(configure_file_if_changed)
         ${CMAKE_COMMAND} -E remove
           ${OUTPUT}
       OUTPUT_QUIET
-      ERROR_QUIET
     )
 
     # generate new file
     configure_file(${INPUT}
       ${OUTPUT} @ONLY)
+    message(STATUS "File was re-generated: ${OUTPUT}")
+  else()
+    message(STATUS "Skipped file generation: ${OUTPUT}")
+    if(NOT EXISTS "${OUTPUT}")
+      message(FATAL_ERROR "Unable to find required file: ${OUTPUT}")
+    endif()
   endif(INTERNAL_NEED_TO_UPDATE_FILE)
 
   # file generation may fail due to OS or drive issues (not enough disk space, etc.)
