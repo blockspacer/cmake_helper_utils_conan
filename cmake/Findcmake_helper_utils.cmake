@@ -4534,3 +4534,86 @@ function(configure_file_if_changed)
   set_source_files_properties(${OUTPUT}
     PROPERTIES GENERATED TRUE)
 endfunction()
+
+# Filter values through regex
+function(filter_regex)
+  # see https://cliutils.gitlab.io/modern-cmake/chapters/basics/functions.html
+  #set(options ) # empty
+  set(oneValueArgs OUTPUT_VAR IS_INCLUDE_REGEX REGEX)
+  set(multiValueArgs INPUT_ITEMS)
+  #
+  cmake_parse_arguments(
+    ARGUMENTS # prefix of output variables
+    "${options}" # list of names of the boolean arguments (only defined ones will be true)
+    "${oneValueArgs}" # list of names of mono-valued arguments
+    "${multiValueArgs}" # list of names of multi-valued arguments (output variables are lists)
+    ${ARGN} # arguments of the function to parse, here we take the all original ones
+  )
+  #
+  set(INPUT_ITEMS)
+  list(APPEND INPUT_ITEMS ${ARGUMENTS_INPUT_ITEMS})
+  #
+  set(OUTPUT_VAR ${ARGUMENTS_OUTPUT_VAR})
+  #
+  set(IS_INCLUDE_REGEX ${ARGUMENTS_IS_INCLUDE_REGEX})
+  #
+  set(REGEX ${ARGUMENTS_REGEX})
+  #
+  set(result_list)
+  foreach(element ${INPUT_ITEMS})
+    string(REGEX MATCH ${REGEX} has_match ${element})
+    if(has_match)
+      if(IS_INCLUDE_REGEX)
+        list(APPEND result_list ${element})
+      endif()
+    else()
+      if(NOT IS_INCLUDE_REGEX)
+        list(APPEND result_list ${element})
+      endif()
+    endif()
+  endforeach()
+
+  # put result in parent scope variable
+  set(${OUTPUT_VAR} ${result_list} PARENT_SCOPE)
+endfunction()
+
+# USAGE
+#
+# set(MY_SOURCES "1" "2" "3"  "4")
+# remove_from_list(
+#   CHECK_EXISTS TRUE
+#   INPUT ${MY_SOURCES}
+#   OUTPUT MY_SOURCES
+#   ITEMS "1"
+#         "3")
+# message(STATUS "MY_SOURCES=${MY_SOURCES}")
+# # Will print MY_SOURCES=2;4
+#
+function(remove_from_list)
+  # see https://cliutils.gitlab.io/modern-cmake/chapters/basics/functions.html
+  #set(options ) # empty
+  set(oneValueArgs OUTPUT CHECK_EXISTS)
+  set(multiValueArgs ITEMS INPUT)
+  #
+  cmake_parse_arguments(
+    ARGUMENTS # prefix of output variables
+    "${options}" # list of names of the boolean arguments (only defined ones will be true)
+    "${oneValueArgs}" # list of names of mono-valued arguments
+    "${multiValueArgs}" # list of names of multi-valued arguments (output variables are lists)
+    ${ARGN} # arguments of the function to parse, here we take the all original ones
+  )
+  #
+  set(result_input ${ARGUMENTS_INPUT})
+  foreach(element ${ARGUMENTS_ITEMS})
+    if(ARGUMENTS_CHECK_EXISTS)
+      if ("${element}" IN_LIST result_input)
+        message(FATAL ERROR "Unable to remove not-existing element ${element} from list to create ${ARGUMENTS_OUTPUT}")
+      endif()
+    endif(ARGUMENTS_CHECK_EXISTS)
+    list(REMOVE_ITEM result_input ${element})
+    if ("${element}" IN_LIST result_input)
+      message(FATAL ERROR "Unable to remove multiple occurrences of element ${element} from list")
+    endif()
+  endforeach()
+  set(${ARGUMENTS_OUTPUT} ${result_input} PARENT_SCOPE)
+endfunction()
