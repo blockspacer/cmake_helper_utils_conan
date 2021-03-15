@@ -4617,3 +4617,68 @@ function(remove_from_list)
   endforeach()
   set(${ARGUMENTS_OUTPUT} ${result_input} PARENT_SCOPE)
 endfunction()
+
+# USAGE
+#
+# sanitize_lib(LIB_NAME ${PROJECT_NAME}
+#   MSAN ${ENABLE_MSAN}
+#   TSAN ${ENABLE_TSAN}
+#   ASAN ${ENABLE_ASAN}
+#   UBSAN ${ENABLE_UBSAN}
+# )
+function(sanitize_lib)
+  # see https://cliutils.gitlab.io/modern-cmake/chapters/basics/functions.html
+  #set(options ) # empty
+  set(oneValueArgs LIB_NAME MSAN TSAN ASAN UBSAN) 
+  # set(multiValueArgs ) # empty
+  #
+  cmake_parse_arguments(
+    ARGUMENTS # prefix of output variables
+    "${options}" # list of names of the boolean arguments (only defined ones will be true)
+    "${oneValueArgs}" # list of names of mono-valued arguments
+    "${multiValueArgs}" # list of names of multi-valued arguments (output variables are lists)
+    ${ARGN} # arguments of the function to parse, here we take the all original ones
+  )
+  #
+  set(LIB_NAME ${ARGUMENTS_LIB_NAME})
+  #
+  if(${ARGUMENTS_MSAN})
+    message(STATUS "enabling MSAN on ${LIB_NAME}")
+    add_msan_static_link(${LIB_NAME})
+    add_msan_definitions(${LIB_NAME})
+    add_msan_flags()
+  else()
+    message(STATUS
+      "Disabled MSAN on ${LIB_NAME}")
+  endif()
+
+  if(${ARGUMENTS_TSAN})
+    message(STATUS "enabling TSAN on ${LIB_NAME}")
+    add_tsan_static_link(${LIB_NAME})
+    add_tsan_definitions(${LIB_NAME})
+    add_tsan_flags()
+  else()
+    message(STATUS
+      "Disabled TSAN on ${LIB_NAME}")
+  endif()
+
+  if(${ARGUMENTS_ASAN})
+    message(STATUS "enabling ASAN on ${LIB_NAME}")
+    add_asan_static_link(${LIB_NAME})
+    add_asan_definitions(${LIB_NAME})
+    add_asan_flags()
+  else()
+    message(STATUS
+      "Disabled ASAN on ${LIB_NAME}")
+  endif()
+
+  if(${ARGUMENTS_UBSAN})
+    message(STATUS "enabling UBSAN on ${LIB_NAME}")
+    add_ubsan_static_link(${LIB_NAME})
+    add_ubsan_definitions(${LIB_NAME})
+    add_ubsan_flags()
+  else()
+    message(STATUS
+      "Disabled UBSAN on ${LIB_NAME}")
+  endif()
+endfunction(sanitize_lib)
