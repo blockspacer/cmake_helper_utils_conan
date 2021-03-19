@@ -133,8 +133,8 @@ class cmake_helper_utils_conan_project(ConanFile):
 
         if self.options.enable_tests:
           self.output.info('Running tests')
-          self.run('ctest --parallel %s' % (cpu_count))
-          # TODO: use cmake.test()
+          # self.run('ctest --parallel %s' % (cpu_count))
+          cmake.test()
 
     # Importing files copies files from the local store to your project.
     def imports(self):

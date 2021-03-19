@@ -755,11 +755,11 @@ function(cppcheck_enabler)
     set(CPPCHECK_DEFAULT_SUPRESSIONS_ARG
       --suppressions-list=${CPPCHECK_SUPRESSIONS}
     )
-    message(STATUS
+    message_if(ARGUMENTS_VERBOSE STATUS
       "found cppcheck config file: ${CPPCHECK_SUPRESSIONS}"
     )
   else()
-    message(WARNING
+    message_if(ARGUMENTS_VERBOSE WARNING
       "unable to find cppcheck config file: ${CPPCHECK_SUPRESSIONS}"
     )
   endif()
@@ -1143,12 +1143,12 @@ function(valgrind_enabler)
     set(MEMORYCHECK_DEFAULT_SUPRESSIONS_ARG
       --suppressions=${MEMORYCHECK_SUPRESSIONS}
     )
-    message(STATUS
-      "found valgrind config file: ${MEMORYCHECK_SUPRESSIONS}"
+    message_if(ARGUMENTS_VERBOSE STATUS
+      "found valgrind config file: ${CPPCHECK_SUPRESSIONS}"
     )
   else()
-    message(WARNING
-      "unable to find valgrind config file: ${MEMORYCHECK_SUPRESSIONS}"
+    message_if(ARGUMENTS_VERBOSE WARNING
+      "unable to find valgrind config file: ${CPPCHECK_SUPRESSIONS}"
     )
   endif()
 
@@ -4606,13 +4606,13 @@ function(remove_from_list)
   set(result_input ${ARGUMENTS_INPUT})
   foreach(element ${ARGUMENTS_ITEMS})
     if(ARGUMENTS_CHECK_EXISTS)
-      if ("${element}" IN_LIST result_input)
-        message(FATAL ERROR "Unable to remove not-existing element ${element} from list to create ${ARGUMENTS_OUTPUT}")
+      if (NOT "${element}" IN_LIST result_input)
+        message(FATAL_ERROR "Unable to remove not-existing element ${element} from list to create ${ARGUMENTS_OUTPUT}")
       endif()
     endif(ARGUMENTS_CHECK_EXISTS)
     list(REMOVE_ITEM result_input ${element})
     if ("${element}" IN_LIST result_input)
-      message(FATAL ERROR "Unable to remove multiple occurrences of element ${element} from list")
+      message(FATAL_ERROR "Unable to remove multiple occurrences of element ${element} from list to create ${ARGUMENTS_OUTPUT}")
     endif()
   endforeach()
   set(${ARGUMENTS_OUTPUT} ${result_input} PARENT_SCOPE)
