@@ -4682,3 +4682,191 @@ function(sanitize_lib)
       "Disabled UBSAN on ${LIB_NAME}")
   endif()
 endfunction(sanitize_lib)
+
+macro(set_tests_default_compile_options target)
+  target_compile_options(${target} PRIVATE
+      $<$<CXX_COMPILER_ID:MSVC>:
+      /W3 # Set warning level
+      #/WX # Treats all compiler warnings as errors.
+      >
+      $<$<CXX_COMPILER_ID:GNU>:
+      -Wformat=2
+      -Wall
+      -W
+  ##              "$<$<CONFIG:RELEASE>:-Werror>" # Treats all compiler warnings as errors.
+      -Wpedantic
+      #-fsanitize-address-use-after-scope # https://clang.llvm.org/docs/AddressSanitizer.html
+      #-fsanitize=pointer-compare # https://kristerw.blogspot.com/2018/06/useful-gcc-address-sanitizer-checks-not.html
+      -fno-omit-frame-pointer # https://github.com/google/sanitizers/wiki/AddressSanitizer#using-addresssanitizer
+      >
+      $<$<CXX_COMPILER_ID:Clang>:
+      -Wformat=2
+      -Wall
+      -W
+  ##              "$<$<CONFIG:RELEASE>:-Werror>" # Treats all compiler warnings as errors.
+      -Wpedantic
+      -Wdeprecated-register
+      #-fsanitize-address-use-after-scope # https://clang.llvm.org/docs/AddressSanitizer.html
+      #-fsanitize=pointer-compare # https://kristerw.blogspot.com/2018/06/useful-gcc-address-sanitizer-checks-not.html
+      -fno-omit-frame-pointer # https://github.com/google/sanitizers/wiki/AddressSanitizer#using-addresssanitizer
+      >
+  )
+
+  # @see https://github.com/eranpeer/FakeIt
+  target_compile_options( ${target} PRIVATE
+    # If you don't use /ZI, you will have exceptions mocking destructors (which includes unique_ptr and other smart pointers).
+    $<$<CXX_COMPILER_ID:MSVC>:/ZI>
+    # On GCC, optimization flag O2 and O3 are not supported. You must compile the test project with -O1 or -O0.
+    $<$<CXX_COMPILER_ID:GNU>:-O0>
+    $<$<CXX_COMPILER_ID:Clang>:-O0> )
+
+  target_compile_options(${target} PUBLIC
+    -Wno-c++11-narrowing
+    -Wno-c++98-compat
+    -Wno-reserved-id-macro
+    -Wno-macro-redefined
+    -Wno-implicit-function-declaration
+    -Wno-c++11-narrowing
+    -Wno-builtin-macro-redefined
+    #  format string is not a string literal
+    -Wno-format-nonliteral
+    -fno-exceptions # disabling exceptions
+    # definition of implicit copy assignment operator
+    # for 'Location' is deprecated because it has a user-declared copy constructor
+    -Wno-deprecated-copy
+    # trace_event.h: warning: unused function template 'AddMetadataEvent'
+    -Wno-unused-template
+    # warning: empty expression statement has no effect; remove unnecessary ';'
+    # to silence this warning [-Wextra-semi-stmt]
+    # TRACE_EVENT0
+    -Wno-extra-semi-stmt
+    -Wno-unused-parameter
+    -Wno-unused-variable
+    -Wno-old-style-cast
+    # frame.h: warning: definition of implicit copy constructor for 'Frame'
+    # is deprecated because it has a user-declared destructor
+    -Wno-deprecated-copy-dtor
+    # fixes base/logging.h:406:65: warning: token pasting of ',' and __VA_ARGS__ is a GNU extension [-Wgnu-zero-variadic-macro-arguments]
+    -Wno-gnu-zero-variadic-macro-arguments
+    -Wno-missing-field-initializers
+    -Wno-implicit-int-float-conversion
+    -Wno-gnu-statement-expression
+  )
+endmacro()
+
+# USAGE
+#
+# set( TEST_ARGS
+#   "--gtest_repeat=1"
+#   "--gtest_shuffle")
+#
+# set(single_unittest_target run_test_${test_name})
+#
+# set( source_list
+#   "main_gtest.cc"
+#   "my_tests.cc"
+#   "util_one.cc"
+#   "util_two.cc")
+#
+# add_test_executable_and_targets("${test_name}" "${single_unittest_target}" "${source_list}" "${TEST_ARGS}")
+#
+macro(add_test_executable_and_targets test_name single_unittest_target source_list TEST_ARGS)
+  add_executable(${test_name} ${source_list})
+
+  add_test(
+    NAME ${test_name}
+    COMMAND ${test_name} ${TEST_ARGS})
+
+  add_single_unittest_target(
+    ADD_TARGET ${single_unittest_target}
+    TEST_NAME ${test_name}
+  )
+endmacro()
+
+# Creates target that can be used to run single unittest using
+# cmake -E time cmake --build . --target ${ADD_TARGET}
+#
+# By default `ctest` runs all unittests,
+# so we have to use regex `-R '^${TEST_NAME}'`.
+#
+# ARGUMENTS
+#
+# ADD_TARGET - target that will be created to run single unittest using regex
+# TEST_NAME - target created by `add_test(...)`
+# CTEST_ARGS - overrides default ctest options.
+#
+# NOTE: Takes into consideration environment varariable CTEST_ARGS
+#
+# CTEST_ARGS="--repeat-until-fail 9;--force-new-ctest-process;--verbose;--output-on-failure;--parallel 9;--timeout 600" \
+#   cmake -E time \
+#     conan build .. --build-folder=. \
+#       > .test_log
+#
+# USAGE
+#
+# set(GTEST_TEST_ARGS
+#   "--gtest_repeat=1"
+#   "--gtest_shuffle")
+#
+# add_test(
+#   NAME ${target}
+#   COMMAND ${target} ${GTEST_TEST_ARGS})
+#
+# add_single_unittest_target(
+#   ADD_TARGET run_test_${target}
+#   TEST_NAME ${target}
+# )
+#
+function(add_single_unittest_target)
+  # see https://cliutils.gitlab.io/modern-cmake/chapters/basics/functions.html
+  #set(options ) # empty
+  set(oneValueArgs TEST_NAME ADD_TARGET CTEST_ARGS)
+  #set(multiValueArgs ) # empty
+  #
+  cmake_parse_arguments(
+    ARGUMENTS # prefix of output variables
+    "${options}" # list of names of the boolean arguments (only defined ones will be true)
+    "${oneValueArgs}" # list of names of mono-valued arguments
+    "${multiValueArgs}" # list of names of multi-valued arguments (output variables are lists)
+    ${ARGN} # arguments of the function to parse, here we take the all original ones
+  )
+  #
+  set(ADD_TARGET ${ARGUMENTS_ADD_TARGET})
+  #
+  set(TEST_NAME ${ARGUMENTS_TEST_NAME})
+  #
+  if(NOT "${ARGUMENTS_CTEST_ARGS}" STREQUAL "")
+    set(CTEST_ARGS ${ARGUMENTS_CTEST_ARGS})
+  elseif(NOT "$ENV{CTEST_ARGS}" STREQUAL "")
+    set(CTEST_ARGS $ENV{CTEST_ARGS})
+  else()
+    # default CTest options
+    set(CTEST_ARGS
+      # Require each test to run <n> times without failing in order to pass.
+      --repeat-until-fail 1
+      --force-new-ctest-process
+      --verbose
+      --output-on-failure
+      --config $<CONFIG>
+      --parallel ${NUM_PROCESSORS}
+      --timeout 600
+    )
+  endif()
+  #
+  # Load addional modules
+  include(ProcessorCount)
+  ProcessorCount(NUM_PROCESSORS)
+  set(NUM_PROCESSORS ${NUM_PROCESSORS} CACHE STRING "Processor count")
+  set(TARGET_CTEST_COMMAND
+    ${CMAKE_CTEST_COMMAND}
+      -R '^${TEST_NAME}'
+      ${CTEST_ARGS}
+  )
+  add_custom_target(${ADD_TARGET}
+      COMMAND ${CMAKE_COMMAND} -E echo ----------------------------------
+      COMMAND ${TARGET_CTEST_COMMAND}
+      COMMAND ${CMAKE_COMMAND} -E echo ----------------------------------
+      COMMENT "Running ${TARGET_CTEST_COMMAND}"
+      DEPENDS ${TEST_NAME}
+  )
+endfunction(add_single_unittest_target)
